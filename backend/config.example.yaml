@@ -1,0 +1,36 @@
+# Brain Radiology FM Portal — Backend Configuration
+# Copy this file to config.yaml and adjust for your workstation or research server.
+
+# Directory where job scratches, uploaded NIfTI files, and output masks are stored
+work_dir: ./work
+
+# Allowed browser origins (GitHub Pages URL + localhost dev servers)
+origins:
+  - "*"
+
+# Shared secret required in X-Portal-Key header (leave empty only on trusted localhost)
+portal_key: ""
+
+# Whitelisted server directories for `Path on server` NIfTI / BIDS / DICOM inputs
+allowed_scan_roots:
+  # - /data/bids_cohorts
+  # - D:/NeuroImaging/BraTS
+
+# Compute device: "auto" (prefers cuda:0 -> mps -> cpu), "cuda:0", or "cpu"
+device: auto
+
+# Set true (or env PORTAL_MOCK=1) to run analytical 3D brain phantom wiring without weights
+mock: false
+
+# Maximum single-upload size in MB (3D/4D NIfTI volumes)
+max_upload_mb: 1024
+
+# Optional external repository / checkpoint paths for non-HuggingFace models
+synthseg_repo: ""
+fastsurfer_repo: ""
+brainfm_repo: ""
+brainmorph_repo: ""
+brainmvp_ckpt: ""
+brainfound_ucl_ckpt: ""
+brainfound_mm_ckpt: ""
+braingfm_ckpt: ""

@@ -1,0 +1,1227 @@
+{
+  "version": "2026-11-15",
+  "portal": {
+    "name": "Brain Radiology FM Portal",
+    "short_name": "NeuroRad-FM",
+    "tagline": "Open-weight 3D brain MRI, head CT, PET & fMRI foundation models on one neuroradiology bench."
+  },
+  "verified_against": {
+    "HF": "Hugging Face model card & file listing",
+    "GH": "Official GitHub repository & inference README",
+    "Paper": "Peer-reviewed publication or preprint (DOI / arXiv / medRxiv)",
+    "MONAI": "MONAI / NIfTI volumetric I/O specification"
+  },
+  "categories": {
+    "vol_enc": {
+      "label": "3D Volumetric Encoders",
+      "blurb": "Self-supervised 3D Vision Transformers and ResNets encoding structural T1w, multi-parametric MRI, and Head CT volumes into patient-level biomarkers and embeddings."
+    },
+    "vlm": {
+      "label": "Neuro Vision–Language & Report FMs",
+      "blurb": "Multimodal 3D/2D neuroradiology models for study-level diagnostic triage, zero-shot abnormality scoring, VQA, and structured MRI/CT report generation."
+    },
+    "seg": {
+      "label": "3D Parcellation & Lesion Segmentation",
+      "blurb": "Contrast-agnostic whole-brain anatomical parcellation, glioma/stroke lesion delineation, and 3D point/box-promptable volumetric segmenters."
+    },
+    "morph": {
+      "label": "Synthesis, Registration & Multi-Task",
+      "blurb": "Cross-sequence MRI/CT translation (e.g. missing FLAIR synthesis), bias-field correction, and foundational 3D keypoint atlas registration."
+    },
+    "fmri": {
+      "label": "4D fMRI & Connectome FMs",
+      "blurb": "Spatiotemporal and brain-graph foundation models decoding intrinsic functional networks and neurological/psychiatric states from BOLD fMRI."
+    }
+  },
+  "modalities": {
+    "mri_multi": {
+      "label": "Structural & mpMRI (T1/T2/FLAIR/DWI)"
+    },
+    "mri_ct": {
+      "label": "Cross-Modal Brain MRI + Head CT"
+    },
+    "ct": {
+      "label": "Head & Cranial CT"
+    },
+    "fmri": {
+      "label": "4D fMRI & Connectomics"
+    }
+  },
+  "tasks": {
+    "embed_volumes": {
+      "label": "Embed 3D volumes",
+      "input": "volumes",
+      "outputs": [
+        "3D scan embeddings (.h5 & .csv)",
+        "Cohort PCA scatter coloured by k-means cluster",
+        "Pairwise scan cosine-similarity heatmap"
+      ]
+    },
+    "brain_health": {
+      "label": "BrainAge & morphometry",
+      "input": "volume",
+      "outputs": [
+        "Predicted BrainAge & Brain-Age Gap (BAG)",
+        "Regional volumetric & risk biomarker scores",
+        "Tri-planar (Axial / Coronal / Sagittal) scan preview"
+      ]
+    },
+    "zeroshot_neuro": {
+      "label": "Zero-shot / Dx triage",
+      "input": "volume",
+      "outputs": [
+        "Differential finding / sequence probabilities",
+        "Tri-planar scan & saliency preview",
+        "Downloadable diagnostic scores (.csv)"
+      ]
+    },
+    "report_vqa": {
+      "label": "Radiology report & VQA",
+      "input": "volume",
+      "outputs": [
+        "Structured neuroradiology report (Findings & Impression)",
+        "Prompted clinical VQA answer & finding confidence bars",
+        "Downloadable JSON & plain-text report"
+      ]
+    },
+    "segment_brain": {
+      "label": "3D Segment & volumetry",
+      "input": "volume",
+      "outputs": [
+        "Interactive tri-planar segmentation overlay (Axial / Coronal / Sagittal)",
+        "Anatomical structure / lesion volume table (mm³ & % ICV)",
+        "3D label mask (.nii.gz) compatible with 3D Slicer & ITK-SNAP"
+      ]
+    },
+    "synth_register": {
+      "label": "Synthesize / register 3D",
+      "input": "volume",
+      "outputs": [
+        "Tri-planar synthesized target modality or MNI152-registered volume",
+        "Cross-modality / alignment quality metrics (SSIM, Jacobian)",
+        "Downloadable NIfTI volume (.nii.gz)"
+      ]
+    },
+    "decode_fmri": {
+      "label": "Decode fMRI networks",
+      "input": "volume",
+      "outputs": [
+        "Intrinsic functional network activation profile (7 Yeo networks)",
+        "Parcel-to-parcel functional connectivity matrix",
+        "Predicted brain-state / phenotype scores (.csv)"
+      ]
+    }
+  },
+  "models": [
+    {
+      "id": "neurovfm_enc",
+      "name": "NeuroVFM Encoder",
+      "developer": "Univ. of Michigan (MLiNS Lab)",
+      "category": "vol_enc",
+      "modality": "mri_ct",
+      "seq_hint": "Any clinical Brain MRI sequence or Head CT study (NIfTI / DICOM)",
+      "runner": "vol_enc",
+      "arch": "3D ViT (Vol-JEPA)",
+      "embed_dim": 1024,
+      "voxel_spec": "Multi-view 3D tokens (1–5 mm)",
+      "hf_repo": "mlinslab/neurovfm-encoder",
+      "link": "https://huggingface.co/mlinslab/neurovfm-encoder",
+      "licence": "Apache-2.0 (code) / Gated clinical weights",
+      "commercial_use": false,
+      "gated": true,
+      "tasks": ["embed_volumes", "brain_health"],
+      "source": "HF+GH+Paper",
+      "notes": "Pretrained via Volumetric Joint-Embedding Predictive Architecture (Vol-JEPA) on 5.24 million uncurated health-system Brain MRI and Head CT volumes.",
+      "paper_label": "Nature Medicine 2026",
+      "paper_url": "https://doi.org/10.1038/s41591-026-04497-1",
+      "citation": "Kondepudi et al., Health system learning enables generalist neuroimaging models (NeuroVFM), Nature Medicine (2026)",
+      "weights": [
+        {
+          "via": "hf",
+          "repo": "mlinslab/neurovfm-encoder",
+          "type": "model",
+          "files": ["config.json", "model.safetensors"],
+          "gb": 1.24
+        }
+      ],
+      "requires_models": [],
+      "weights_gb": 1.24,
+      "runtime_weights_gb": 1.24
+    },
+    {
+      "id": "neuro_jepa",
+      "name": "Neuro-JEPA",
+      "developer": "NYU Langone Health (NYUMedML / Razavian Lab)",
+      "category": "vol_enc",
+      "modality": "mri_multi",
+      "seq_hint": "Multimodal 3D Brain MRI (T1w, T2w, FLAIR; single- or multi-sequence)",
+      "runner": "vol_enc",
+      "arch": "3D V-JEPA + Sparse MoE",
+      "embed_dim": 768,
+      "voxel_spec": "128×128×128 3D latent tokens",
+      "hf_repo": "NYUMedML/Neuro-JEPA",
+      "link": "https://huggingface.co/NYUMedML/Neuro-JEPA",
+      "licence": "CC BY-NC-ND 4.0 (Gated academic research)",
+      "commercial_use": false,
+      "gated": true,
+      "tasks": ["embed_volumes", "brain_health"],
+      "source": "HF+GH+Paper",
+      "notes": "Sparse Mixture-of-Experts latent predictive 3D foundation model pretrained on >1.55M curated brain MRI scans (~428K studies) at NYU Langone across T1w, T2w, and FLAIR; benchmarked on 47 downstream tasks.",
+      "paper_label": "arXiv:2606.14957",
+      "paper_url": "https://arxiv.org/abs/2606.14957",
+      "citation": "Huang, Razavian et al., Learning Sparse Latent Predictive Foundation Model for Multimodal Neuroimaging (Neuro-JEPA), arXiv:2606.14957 (2026)",
+      "weights": [
+        {
+          "via": "hf",
+          "repo": "NYUMedML/Neuro-JEPA",
+          "type": "model",
+          "files": ["config.json", "model.safetensors"],
+          "gb": 1.48
+        }
+      ],
+      "requires_models": [],
+      "weights_gb": 1.48,
+      "runtime_weights_gb": 1.48
+    },
+    {
+      "id": "brainfound_ucl",
+      "name": "BrainFound (3D DINOv2 MRI)",
+      "developer": "Univ. College London (Mazher, Parker & Alexander)",
+      "category": "vol_enc",
+      "modality": "mri_multi",
+      "seq_hint": "Single- or multi-contrast 3D Brain MRI (T1w, T2w, FLAIR)",
+      "runner": "vol_enc",
+      "arch": "3D-Adapted DINOv2 ViT",
+      "embed_dim": 768,
+      "voxel_spec": "Sequential 3D volumetric MRI",
+      "hf_repo": null,
+      "link": "https://github.com/Moona-Mazher/BrainFound",
+      "licence": "Academic / Open-source",
+      "commercial_use": false,
+      "gated": false,
+      "tasks": ["embed_volumes", "brain_health", "segment_brain"],
+      "source": "GH+Paper",
+      "notes": "Extends DINOv2 Vision Transformers to 3D brain anatomy across T1, T2, and FLAIR scans; strong label-efficient representations for disease classification, detection, and tumor/anatomical segmentation.",
+      "paper_label": "npj Imaging 2026",
+      "paper_url": "https://doi.org/10.1038/s44303-026-00176-5",
+      "citation": "Mazher, Parker & Alexander, Towards generalisable foundation models for brain MRI (BrainFound), npj Imaging (2026)",
+      "weights": [
+        {
+          "via": "external",
+          "url": "https://github.com/Moona-Mazher/BrainFound",
+          "note": "Clone Moona-Mazher/BrainFound and set brainfound_ucl_ckpt in backend/config.yaml.",
+          "gb": null
+        }
+      ],
+      "requires_models": [],
+      "weights_gb": 0.44,
+      "runtime_weights_gb": 0.44
+    },
+    {
+      "id": "brainiac",
+      "name": "BrainIAC",
+      "developer": "Harvard / Mass General Brigham (Kann Lab)",
+      "category": "vol_enc",
+      "modality": "mri_multi",
+      "seq_hint": "3D structural Brain MRI (T1w, T2w, FLAIR, T1ce)",
+      "runner": "vol_enc",
+      "arch": "3D ViT-B/16 (SimCLR)",
+      "embed_dim": 768,
+      "voxel_spec": "96×96×96 @ 1.5 mm",
+      "hf_repo": "Divytak/brainiac",
+      "link": "https://github.com/AIM-KannLab/BrainIAC",
+      "licence": "MIT / Academic",
+      "commercial_use": false,
+      "gated": false,
+      "tasks": ["embed_volumes", "brain_health"],
+      "source": "GH+HF+Paper",
+      "notes": "Trained on ~49,000 multi-institutional brain MRIs. Generalizes across BrainAge estimation, glioma IDH mutation status, MCI conversion risk, and stroke timing.",
+      "paper_label": "Nature Neuroscience 2026",
+      "paper_url": "https://doi.org/10.1038/s41593-026-02202-6",
+      "citation": "Tak, Kann et al., A generalizable foundation model for analysis of human brain MRI (BrainIAC), Nature Neuroscience (2026)",
+      "weights": [
+        {
+          "via": "hf",
+          "repo": "Divytak/brainiac",
+          "type": "model",
+          "files": ["BrainIAC.ckpt"],
+          "gb": 0.42
+        }
+      ],
+      "requires_models": [],
+      "weights_gb": 0.42,
+      "runtime_weights_gb": 0.42
+    },
+    {
+      "id": "brain2vec",
+      "name": "Brain2Vec",
+      "developer": "UPenn CBICA (iSTAGING)",
+      "category": "vol_enc",
+      "modality": "mri_multi",
+      "seq_hint": "3D T1-weighted structural Brain MRI (MNI-aligned)",
+      "runner": "vol_enc",
+      "arch": "3D Hierarchical SSL Encoder",
+      "embed_dim": 768,
+      "voxel_spec": "160×192×160 @ 1 mm",
+      "hf_repo": "cbica/Brain2Vec",
+      "link": "https://huggingface.co/cbica/Brain2Vec",
+      "licence": "CBICA Academic Research",
+      "commercial_use": false,
+      "gated": true,
+      "tasks": ["embed_volumes", "brain_health"],
+      "source": "HF+GH+Paper",
+      "notes": "Pretrained on 74,425 T1-weighted brain MRI scans across lifespan cohorts; extracts compact 768-d representations for BrainAge, neurodegeneration, and phenotype prediction.",
+      "paper_label": "arXiv:2610.28411",
+      "paper_url": "https://arxiv.org/abs/2610.28411",
+      "citation": "Maggioros, Erus, Davatzikos et al., Brain2Vec: A Self-Supervised 3D Foundation Model for Structural Brain MRI, arXiv:2610.28411 (2026)",
+      "weights": [
+        {
+          "via": "hf",
+          "repo": "cbica/Brain2Vec",
+          "type": "model",
+          "files": ["config.json", "pytorch_model.bin"],
+          "gb": 0.39
+        }
+      ],
+      "requires_models": [],
+      "weights_gb": 0.39,
+      "runtime_weights_gb": 0.39
+    },
+    {
+      "id": "neurofm",
+      "name": "NeuroFM",
+      "developer": "Univ. of Glasgow (NeuroAI)",
+      "category": "vol_enc",
+      "modality": "mri_multi",
+      "seq_hint": "Single 3D T1-weighted Brain MRI",
+      "runner": "vol_enc",
+      "arch": "Lightweight 3D ConvNeXt/ViT (11M)",
+      "embed_dim": 512,
+      "voxel_spec": "128×128×128 @ 1.5 mm",
+      "hf_repo": "NeuroAI-UofG/NeuroFM",
+      "link": "https://huggingface.co/NeuroAI-UofG/NeuroFM",
+      "licence": "Apache-2.0",
+      "commercial_use": true,
+      "gated": false,
+      "tasks": ["brain_health", "embed_volumes"],
+      "source": "HF+GH+Paper",
+      "notes": "Disease-naive 11M-parameter model runnable even on CPU; estimates individualized BrainAge, total brain volume, lateral ventricle volume, and biological sex from one T1w scan.",
+      "paper_label": "medRxiv 2026",
+      "paper_url": "https://doi.org/10.1101/2026.03.30.24305086",
+      "citation": "Svanera et al., NeuroFM: Toward Precision Neuroimaging with Foundation Models for Individualized Brain Health Estimation, medRxiv (2026)",
+      "weights": [
+        {
+          "via": "hf",
+          "repo": "NeuroAI-UofG/NeuroFM",
+          "type": "model",
+          "files": ["model.safetensors", "config.json"],
+          "gb": 0.05
+        }
+      ],
+      "requires_models": [],
+      "weights_gb": 0.05,
+      "runtime_weights_gb": 0.05
+    },
+    {
+      "id": "brainmvp",
+      "name": "BrainMVP",
+      "developer": "HKUST / Multi-institutional",
+      "category": "vol_enc",
+      "modality": "mri_multi",
+      "seq_hint": "Multi-parametric Brain MRI (T1, T1ce, T2, FLAIR; missing-modality tolerant)",
+      "runner": "vol_enc",
+      "arch": "3D Modality-Aware UNETR/ViT",
+      "embed_dim": 768,
+      "voxel_spec": "128×128×128 @ 1 mm (4-ch)",
+      "hf_repo": null,
+      "link": "https://github.com/shaohao011/BrainMVP",
+      "licence": "Apache-2.0",
+      "commercial_use": true,
+      "gated": false,
+      "tasks": ["embed_volumes", "brain_health"],
+      "source": "GH+Paper",
+      "notes": "CVPR Highlight model using cross-modal reconstruction and modality-aware contrastive pretraining to stay accurate when one or more mpMRI sequences are absent.",
+      "paper_label": "CVPR / arXiv:2410.10516",
+      "paper_url": "https://arxiv.org/abs/2410.10516",
+      "citation": "Li et al., BrainMVP: Multi-modal Vision Pre-training for Medical Image Analysis, CVPR / arXiv:2410.10516 (2024)",
+      "weights": [
+        {
+          "via": "external",
+          "url": "https://github.com/shaohao011/BrainMVP",
+          "note": "Download BrainMVP_pretrained.pt from the official GitHub release and set brainmvp_ckpt in config.yaml.",
+          "gb": null
+        }
+      ],
+      "requires_models": [],
+      "weights_gb": 0.36,
+      "runtime_weights_gb": 0.36
+    },
+    {
+      "id": "ct_fm",
+      "name": "CT-FM (Cranial & Body 3D CT)",
+      "developer": "Project-Lighter / Harvard AIM",
+      "category": "vol_enc",
+      "modality": "ct",
+      "seq_hint": "Non-contrast or contrast 3D Head / Cranial CT (Hounsfield Units)",
+      "runner": "vol_enc",
+      "arch": "3D SegResNet Contrastive",
+      "embed_dim": 512,
+      "voxel_spec": "128×128×128 @ 1.5 mm (HU windowed)",
+      "hf_repo": "project-lighter/ct_fm_feature_extractor",
+      "link": "https://huggingface.co/project-lighter/ct_fm_feature_extractor",
+      "licence": "Apache-2.0",
+      "commercial_use": true,
+      "gated": false,
+      "tasks": ["embed_volumes", "brain_health"],
+      "source": "HF+GH+Paper",
+      "notes": "Pretrained via label-agnostic 3D contrastive learning on 148,000 CT volumes from the Imaging Data Commons; strong backbone for acute Head CT triage and case retrieval.",
+      "paper_label": "arXiv:2501.09001",
+      "paper_url": "https://arxiv.org/abs/2501.09001",
+      "citation": "Pai et al., Vision Foundation Models for Computed Tomography (CT-FM), arXiv:2501.09001 (2025)",
+      "weights": [
+        {
+          "via": "hf",
+          "repo": "project-lighter/ct_fm_feature_extractor",
+          "type": "model",
+          "files": ["model.safetensors", "config.json"],
+          "gb": 0.31
+        }
+      ],
+      "requires_models": [],
+      "weights_gb": 0.31,
+      "runtime_weights_gb": 0.31
+    },
+    {
+      "id": "neurovfm_llm",
+      "name": "NeuroVFM-LLM",
+      "developer": "Univ. of Michigan (MLiNS Lab)",
+      "category": "vlm",
+      "modality": "mri_ct",
+      "seq_hint": "Multi-series 3D Brain MRI or Head CT study + optional clinical history",
+      "runner": "neuro_vlm",
+      "arch": "Vol-JEPA + Connector + LLM",
+      "embed_dim": 1024,
+      "voxel_spec": "Full multi-sequence 3D study",
+      "hf_repo": "mlinslab/neurovfm-llm",
+      "link": "https://huggingface.co/mlinslab/neurovfm-llm",
+      "licence": "Apache-2.0 (code) / Gated clinical weights",
+      "commercial_use": false,
+      "gated": true,
+      "tasks": ["report_vqa", "zeroshot_neuro"],
+      "source": "HF+GH+Paper",
+      "notes": "Generates grounded neuroradiology findings and answers clinical questions across multi-sequence Brain MRI and Head CT studies.",
+      "paper_label": "Nature Medicine 2026",
+      "paper_url": "https://doi.org/10.1038/s41591-026-04497-1",
+      "citation": "Kondepudi et al., Health system learning enables generalist neuroimaging models (NeuroVFM), Nature Medicine (2026)",
+      "weights": [
+        {
+          "via": "hf",
+          "repo": "mlinslab/neurovfm-llm",
+          "type": "model",
+          "files": ["config.json", "model.safetensors.index.json"],
+          "gb": 15.8
+        }
+      ],
+      "requires_models": ["neurovfm_enc"],
+      "weights_gb": 15.8,
+      "runtime_weights_gb": 17.04
+    },
+    {
+      "id": "brainfound_mm",
+      "name": "Brainfound (Multimodal CT/MRI/Text)",
+      "developer": "Tsinghua Univ. & Collaborators (Zhang & Dai Lab)",
+      "category": "vlm",
+      "modality": "mri_ct",
+      "seq_hint": "Brain MRI or Head CT slices/volumes + clinical prompt",
+      "runner": "neuro_vlm",
+      "arch": "Contrastive + Diffusion + Multimodal VLM",
+      "embed_dim": 768,
+      "voxel_spec": "Multi-slice Brain CT & MRI + Text",
+      "hf_repo": null,
+      "link": "https://github.com/gingerbread000/Brainfound",
+      "licence": "Academic / Open-source",
+      "commercial_use": false,
+      "gated": false,
+      "tasks": ["report_vqa", "zeroshot_neuro", "synth_register"],
+      "source": "GH+Paper",
+      "notes": "Multi-modal brain imaging copilot pretrained on >3M Head CT slices and >7M Brain MRI slices paired with radiology reports; unifies zero-shot disease diagnosis, report generation, VQA, and cross-modality enhancement/translation.",
+      "paper_label": "Patterns 2026",
+      "paper_url": "https://doi.org/10.1016/j.patter.2026.101538",
+      "citation": "Zhang, Dai et al., A multi-modal foundation model for brain disease diagnosis and medical imaging (Brainfound), Patterns (2026)",
+      "weights": [
+        {
+          "via": "external",
+          "url": "https://github.com/gingerbread000/Brainfound",
+          "note": "Clone gingerbread000/Brainfound and set brainfound_mm_ckpt in backend/config.yaml.",
+          "gb": null
+        }
+      ],
+      "requires_models": [],
+      "weights_gb": 4.2,
+      "runtime_weights_gb": 4.2
+    },
+    {
+      "id": "neurovfm_dx_mri",
+      "name": "NeuroVFM-Dx (Brain MRI)",
+      "developer": "Univ. of Michigan (MLiNS Lab)",
+      "category": "vlm",
+      "modality": "mri_multi",
+      "seq_hint": "Clinical Brain MRI study (T1w / T2w / FLAIR / DWI / SWI)",
+      "runner": "neuro_vlm",
+      "arch": "Vol-JEPA + Study Attention Classifier",
+      "embed_dim": 1024,
+      "voxel_spec": "Multi-series 3D MRI",
+      "hf_repo": "mlinslab/neurovfm-dx-mri",
+      "link": "https://huggingface.co/mlinslab/neurovfm-dx-mri",
+      "licence": "Apache-2.0 (code) / Gated clinical weights",
+      "commercial_use": false,
+      "gated": true,
+      "tasks": ["zeroshot_neuro"],
+      "source": "HF+GH+Paper",
+      "notes": "Study-level multi-label diagnostic classifier for Brain MRI covering acute infarct, glioma/neoplasm, demyelination, hemorrhage, hydrocephalus, and infection.",
+      "paper_label": "Nature Medicine 2026",
+      "paper_url": "https://doi.org/10.1038/s41591-026-04497-1",
+      "citation": "Kondepudi et al., Health system learning enables generalist neuroimaging models (NeuroVFM), Nature Medicine (2026)",
+      "weights": [
+        {
+          "via": "hf",
+          "repo": "mlinslab/neurovfm-dx-mri",
+          "type": "model",
+          "files": ["config.json", "model.safetensors"],
+          "gb": 1.32
+        }
+      ],
+      "requires_models": [],
+      "weights_gb": 1.32,
+      "runtime_weights_gb": 1.32
+    },
+    {
+      "id": "neurovfm_dx_ct",
+      "name": "NeuroVFM-Dx (Head CT)",
+      "developer": "Univ. of Michigan (MLiNS Lab)",
+      "category": "vlm",
+      "modality": "ct",
+      "seq_hint": "Non-contrast / contrast Cranial CT study",
+      "runner": "neuro_vlm",
+      "arch": "Vol-JEPA + Acute CT Triage Head",
+      "embed_dim": 1024,
+      "voxel_spec": "3D Head CT study",
+      "hf_repo": "mlinslab/neurovfm-dx-ct",
+      "link": "https://huggingface.co/mlinslab/neurovfm-dx-ct",
+      "licence": "Apache-2.0 (code) / Gated clinical weights",
+      "commercial_use": false,
+      "gated": true,
+      "tasks": ["zeroshot_neuro"],
+      "source": "HF+GH+Paper",
+      "notes": "Urgent cranial CT diagnostic classifier scoring intracranial hemorrhage (SDH, EDH, SAH, IPH, IVH), mass effect, midline shift, acute ischemia, and skull fracture.",
+      "paper_label": "Nature Medicine 2026",
+      "paper_url": "https://doi.org/10.1038/s41591-026-04497-1",
+      "citation": "Kondepudi et al., Health system learning enables generalist neuroimaging models (NeuroVFM), Nature Medicine (2026)",
+      "weights": [
+        {
+          "via": "hf",
+          "repo": "mlinslab/neurovfm-dx-ct",
+          "type": "model",
+          "files": ["config.json", "model.safetensors"],
+          "gb": 1.32
+        }
+      ],
+      "requires_models": [],
+      "weights_gb": 1.32,
+      "runtime_weights_gb": 1.32
+    },
+    {
+      "id": "braingemma3d",
+      "name": "BrainGemma3D (Brain3D)",
+      "developer": "Univ. Naples Federico II & Northwestern",
+      "category": "vlm",
+      "modality": "mri_multi",
+      "seq_hint": "Native 3D Brain MRI volume (T1w / T1ce / T2w / FLAIR)",
+      "runner": "neuro_vlm",
+      "arch": "Inflated 3D ViT + Gemma-2B/7B LoRA",
+      "embed_dim": 768,
+      "voxel_spec": "128×128×128 3D MRI",
+      "hf_repo": "praiselab-picuslab/BrainGemma3D",
+      "link": "https://huggingface.co/praiselab-picuslab/BrainGemma3D",
+      "licence": "Gemma Terms / Apache-2.0 code",
+      "commercial_use": true,
+      "gated": false,
+      "tasks": ["report_vqa"],
+      "source": "HF+GH+Paper",
+      "notes": "Processes full 3D brain MRI volumes directly (avoiding 2D slice context loss) via an inflated 3D Vision Transformer aligned with Gemma for automated brain MRI report generation.",
+      "paper_label": "arXiv:2602.22098",
+      "paper_url": "https://arxiv.org/abs/2602.22098",
+      "citation": "Barone et al., Brain3D: Brain Report Automation via Inflated Vision Transformers in 3D, arXiv:2602.22098 (2026)",
+      "weights": [
+        {
+          "via": "hf",
+          "repo": "praiselab-picuslab/BrainGemma3D",
+          "type": "model",
+          "files": ["config.json", "adapter_config.json"],
+          "gb": 5.4
+        }
+      ],
+      "requires_models": [],
+      "weights_gb": 5.4,
+      "runtime_weights_gb": 5.4
+    },
+    {
+      "id": "m3d_lamed",
+      "name": "M3D-LaMed (Phi-3-4B)",
+      "developer": "BAAI / CUHK",
+      "category": "vlm",
+      "modality": "mri_ct",
+      "seq_hint": "3D Brain MRI or Head CT volume (32×256×256)",
+      "runner": "neuro_vlm",
+      "arch": "M3D-CLIP 3D ViT + Phi-3-4B",
+      "embed_dim": 768,
+      "voxel_spec": "32×256×256 3D volume",
+      "hf_repo": "GoodBaiBai88/M3D-LaMed-Phi-3-4B",
+      "link": "https://huggingface.co/GoodBaiBai88/M3D-LaMed-Phi-3-4B",
+      "licence": "Apache-2.0 / MIT",
+      "commercial_use": true,
+      "gated": false,
+      "tasks": ["report_vqa", "zeroshot_neuro"],
+      "source": "HF+GH+Paper",
+      "notes": "Trained on M3D-Data (120K 3D volumes & 662K instruction pairs). Supports 3D brain MRI & CT report generation, open-ended VQA, and zero-shot M3D-CLIP retrieval.",
+      "paper_label": "arXiv:2404.00578",
+      "paper_url": "https://arxiv.org/abs/2404.00578",
+      "citation": "Bai et al., M3D: Advancing 3D Medical Image Analysis with Multi-Modal Large Language Models, arXiv:2404.00578 (2024)",
+      "weights": [
+        {
+          "via": "hf",
+          "repo": "GoodBaiBai88/M3D-LaMed-Phi-3-4B",
+          "type": "model",
+          "files": ["config.json", "model.safetensors.index.json"],
+          "gb": 8.4
+        }
+      ],
+      "requires_models": [],
+      "weights_gb": 8.4,
+      "runtime_weights_gb": 8.4
+    },
+    {
+      "id": "medgemma_4b",
+      "name": "MedGemma-4B-IT",
+      "developer": "Google Research / Health AI",
+      "category": "vlm",
+      "modality": "mri_ct",
+      "seq_hint": "Multi-slice Brain MRI / Head CT montage or key axial/coronal/sagittal slices",
+      "runner": "neuro_vlm",
+      "arch": "SigLIP-Med + Gemma-3 4B",
+      "embed_dim": 1152,
+      "voxel_spec": "896×896 multi-slice stack",
+      "hf_repo": "google/medgemma-4b-it",
+      "link": "https://huggingface.co/google/medgemma-4b-it",
+      "licence": "Health AI Developer Foundations Terms",
+      "commercial_use": true,
+      "gated": true,
+      "tasks": ["report_vqa", "zeroshot_neuro"],
+      "source": "HF+Paper",
+      "notes": "Open-weight medical multimodal VLM supporting interleaved Brain MRI and Head CT slice stacks, differential diagnosis VQA, and structured radiology reporting.",
+      "paper_label": "arXiv:2507.05201",
+      "paper_url": "https://arxiv.org/abs/2507.05201",
+      "citation": "Sellergren et al., MedGemma Technical Report, Google Health AI, arXiv:2507.05201 (2025)",
+      "weights": [
+        {
+          "via": "hf",
+          "repo": "google/medgemma-4b-it",
+          "type": "model",
+          "files": ["config.json", "model.safetensors.index.json"],
+          "gb": 8.6
+        }
+      ],
+      "requires_models": [],
+      "weights_gb": 8.6,
+      "runtime_weights_gb": 8.6
+    },
+    {
+      "id": "radfm",
+      "name": "RadFM",
+      "developer": "Shanghai Jiao Tong Univ. & Shanghai AI Lab",
+      "category": "vlm",
+      "modality": "mri_ct",
+      "seq_hint": "2D or 3D Brain MRI / Head CT / PET scans + clinical prompt",
+      "runner": "neuro_vlm",
+      "arch": "3D Perceiver + ViT + LLaMA-13B",
+      "embed_dim": 768,
+      "voxel_spec": "Arbitrary 2D/3D radiology volume",
+      "hf_repo": "chaoyi-wu/RadFM",
+      "link": "https://huggingface.co/chaoyi-wu/RadFM",
+      "licence": "Apache-2.0 / Non-commercial LLaMA",
+      "commercial_use": false,
+      "gated": false,
+      "tasks": ["report_vqa"],
+      "source": "HF+GH+Paper",
+      "notes": "Generalist 2D/3D radiology VLM pretrained on MedMD (16M scans across >5,000 diseases, with substantial neuroimaging coverage on RadBench).",
+      "paper_label": "arXiv:2308.02463",
+      "paper_url": "https://arxiv.org/abs/2308.02463",
+      "citation": "Wu et al., Towards Generalist Foundation Model for Radiology by Leveraging Web-scale 2D&3D Medical Data (RadFM), arXiv:2308.02463 (2023)",
+      "weights": [
+        {
+          "via": "hf",
+          "repo": "chaoyi-wu/RadFM",
+          "type": "model",
+          "files": ["config.json"],
+          "gb": 26.4
+        }
+      ],
+      "requires_models": [],
+      "weights_gb": 26.4,
+      "runtime_weights_gb": 26.4
+    },
+    {
+      "id": "biomedclip",
+      "name": "BiomedCLIP (Neuro Slice Zero-Shot)",
+      "developer": "Microsoft Research",
+      "category": "vlm",
+      "modality": "mri_ct",
+      "seq_hint": "2D Brain MRI / CT / PET slices or central tri-planar projections",
+      "runner": "neuro_vlm",
+      "arch": "ViT-B/16 + PubMedBERT",
+      "embed_dim": 512,
+      "voxel_spec": "224×224 slice / tri-planar pool",
+      "hf_repo": "microsoft/BiomedCLIP-PubMedBERT_256-vit_base_patch16_224",
+      "link": "https://huggingface.co/microsoft/BiomedCLIP-PubMedBERT_256-vit_base_patch16_224",
+      "licence": "MIT",
+      "commercial_use": true,
+      "gated": false,
+      "tasks": ["zeroshot_neuro", "embed_volumes"],
+      "source": "HF+Paper",
+      "notes": "Fast CPU/GPU zero-shot biomedical CLIP trained on PMC-15M. Ideal for rapid MRI sequence classification (T1 vs T2 vs FLAIR vs DWI vs CT) and slice-level lesion screening.",
+      "paper_label": "arXiv:2303.00915",
+      "paper_url": "https://arxiv.org/abs/2303.00915",
+      "citation": "Zhang et al., BiomedCLIP: a multimodal biomedical foundation model pretrained from fifteen million scientific image-text pairs, arXiv:2303.00915 (2023)",
+      "weights": [
+        {
+          "via": "hf",
+          "repo": "microsoft/BiomedCLIP-PubMedBERT_256-vit_base_patch16_224",
+          "type": "model",
+          "files": ["open_clip_pytorch_model.bin", "open_clip_config.json"],
+          "gb": 0.78
+        }
+      ],
+      "requires_models": [],
+      "weights_gb": 0.78,
+      "runtime_weights_gb": 0.78
+    },
+    {
+      "id": "brainsegfounder",
+      "name": "BrainSegFounder",
+      "developer": "Univ. of Florida (SMILE Lab)",
+      "category": "seg",
+      "modality": "mri_multi",
+      "seq_hint": "4-channel mpMRI (T1, T1ce, T2, FLAIR) or T1w stroke MRI",
+      "runner": "segment3d",
+      "arch": "3D SwinUNETR (UK Biobank SSL)",
+      "embed_dim": 768,
+      "voxel_spec": "96×96×96 sliding window @ 1 mm",
+      "hf_repo": "smilelab/BrainSegFounder",
+      "link": "https://huggingface.co/smilelab/BrainSegFounder",
+      "licence": "Apache-2.0",
+      "commercial_use": true,
+      "gated": false,
+      "tasks": ["segment_brain", "embed_volumes"],
+      "source": "HF+GH+Paper",
+      "notes": "Two-stage 3D self-supervised SwinUNETR pretrained on >41,000 UK Biobank brain MRIs with fine-tuned checkpoints for BraTS glioma sub-regions (WT, TC, ET) and ATLAS stroke lesions.",
+      "paper_label": "Med. Image Anal. / arXiv:2406.10395",
+      "paper_url": "https://arxiv.org/abs/2406.10395",
+      "citation": "Cox et al., BrainSegFounder: Towards 3D Foundation Models for Neuroimage Segmentation, Medical Image Analysis / arXiv:2406.10395 (2024)",
+      "weights": [
+        {
+          "via": "hf",
+          "repo": "smilelab/BrainSegFounder",
+          "type": "model",
+          "files": ["BraTS_finetuned.pt"],
+          "gb": 0.25
+        }
+      ],
+      "requires_models": [],
+      "weights_gb": 0.25,
+      "runtime_weights_gb": 0.25
+    },
+    {
+      "id": "synthseg",
+      "name": "SynthSeg 2.0",
+      "developer": "Harvard / MGH Martinos Center",
+      "category": "seg",
+      "modality": "mri_ct",
+      "seq_hint": "Any Brain MRI contrast (T1, T2, FLAIR, clinical thick-slice) or Head CT",
+      "runner": "segment3d",
+      "arch": "Domain-Randomized 3D U-Net",
+      "embed_dim": null,
+      "voxel_spec": "Resampled internally to 1 mm isotropic",
+      "hf_repo": null,
+      "link": "https://github.com/BBillot/SynthSeg",
+      "licence": "Apache-2.0 / FreeSurfer",
+      "commercial_use": true,
+      "gated": false,
+      "tasks": ["segment_brain"],
+      "source": "GH+Paper",
+      "notes": "Contrast- and resolution-agnostic 3D whole-brain parcellation (32+ structures + cortical parcellation + automated QC score & intracranial volume) on clinical MRI or CT without retraining.",
+      "paper_label": "Med. Image Anal. 2023",
+      "paper_url": "https://doi.org/10.1016/j.media.2023.102789",
+      "citation": "Billot et al., SynthSeg: Segmentation of brain MRI scans of any contrast and resolution without retraining, Medical Image Analysis (2023)",
+      "weights": [
+        {
+          "via": "external",
+          "url": "https://github.com/BBillot/SynthSeg",
+          "note": "Bundled with FreeSurfer 7.4+ or clone BBillot/SynthSeg (set synthseg_repo in config.yaml).",
+          "gb": null
+        }
+      ],
+      "requires_models": [],
+      "weights_gb": 0.19,
+      "runtime_weights_gb": 0.19
+    },
+    {
+      "id": "fastsurfer_vinn",
+      "name": "FastSurferVINN",
+      "developer": "DZNE Bonn & Harvard MGH (Deep-MI)",
+      "category": "seg",
+      "modality": "mri_multi",
+      "seq_hint": "3D T1-weighted Brain MRI (0.7–1.0 mm sub-millimeter supported)",
+      "runner": "segment3d",
+      "arch": "Voxel-Size Independent 2.5D CNN",
+      "embed_dim": null,
+      "voxel_spec": "Native 0.7–1.0 mm isotropic",
+      "hf_repo": null,
+      "link": "https://github.com/Deep-MI/FastSurfer",
+      "licence": "Apache-2.0",
+      "commercial_use": true,
+      "gated": false,
+      "tasks": ["segment_brain"],
+      "source": "GH+Paper",
+      "notes": "95-class Desikan-Killiany-Tourville (DKT) whole-brain cortical & subcortical parcellation in under 1 minute on GPU, matching FreeSurfer morphometry.",
+      "paper_label": "NeuroImage 2022",
+      "paper_url": "https://doi.org/10.1016/j.neuroimage.2022.119512",
+      "citation": "Henschel et al., FastSurferVINN: Building resolution-independence into deep learning segmentation methods, NeuroImage (2022)",
+      "weights": [
+        {
+          "via": "external",
+          "url": "https://github.com/Deep-MI/FastSurfer",
+          "note": "Install FastSurfer or Docker deepmi/fastsurfer; checkpoints auto-download on first run.",
+          "gb": null
+        }
+      ],
+      "requires_models": [],
+      "weights_gb": 0.16,
+      "runtime_weights_gb": 0.16
+    },
+    {
+      "id": "vista3d",
+      "name": "VISTA3D",
+      "developer": "NVIDIA & MONAI Consortium",
+      "category": "seg",
+      "modality": "mri_ct",
+      "seq_hint": "3D CT or Brain MRI volume (auto class ID or 3D click prompt)",
+      "runner": "segment3d",
+      "arch": "3D SegResNet + Dual Auto/Interactive Heads",
+      "embed_dim": null,
+      "voxel_spec": "128×128×128 @ 1.5 mm",
+      "hf_repo": "MONAI/vista3d",
+      "link": "https://huggingface.co/MONAI/vista3d",
+      "licence": "Apache-2.0",
+      "commercial_use": true,
+      "gated": false,
+      "tasks": ["segment_brain"],
+      "source": "HF+MONAI+Paper",
+      "notes": "Unified 3D foundation segmenter combining automatic multi-structure segmentation with interactive zero-shot 3D point prompting for novel lesions.",
+      "paper_label": "arXiv:2406.05285",
+      "paper_url": "https://arxiv.org/abs/2406.05285",
+      "citation": "He et al., VISTA3D: A Unified Segmentation Foundation Model For 3D Medical Imaging, arXiv:2406.05285 (2024)",
+      "weights": [
+        {
+          "via": "hf",
+          "repo": "MONAI/vista3d",
+          "type": "model",
+          "files": ["models/model.pt"],
+          "gb": 0.89
+        }
+      ],
+      "requires_models": [],
+      "weights_gb": 0.89,
+      "runtime_weights_gb": 0.89
+    },
+    {
+      "id": "nninteractive",
+      "name": "nnInteractive",
+      "developer": "DKFZ Heidelberg (MIC-DKFZ)",
+      "category": "seg",
+      "modality": "mri_ct",
+      "seq_hint": "Any 3D Brain MRI, Head CT, or PET volume + point / box / scribble prompt",
+      "runner": "segment3d",
+      "arch": "3D Residual Encoder U-Net (nnU-Net v2)",
+      "embed_dim": null,
+      "voxel_spec": "Adaptive 3D patch spacing",
+      "hf_repo": "nnInteractive/nnInteractive",
+      "link": "https://github.com/MIC-DKFZ/nnInteractive",
+      "licence": "Apache-2.0",
+      "commercial_use": true,
+      "gated": false,
+      "tasks": ["segment_brain"],
+      "source": "HF+GH+Paper",
+      "notes": "True 3D promptable open-set segmentation trained on 120+ volumetric datasets across MRI, CT, and PET. Excels at brain tumors, metastases, aneurysms, and edema from a single 3D click or box.",
+      "paper_label": "arXiv:2503.08373",
+      "paper_url": "https://arxiv.org/abs/2503.08373",
+      "citation": "Isensee et al., nnInteractive: Redefining 3D Promptable Segmentation, arXiv:2503.08373 (2025)",
+      "weights": [
+        {
+          "via": "hf",
+          "repo": "nnInteractive/nnInteractive",
+          "type": "model",
+          "files": ["nnInteractive_v1.0/fold_0/checkpoint_final.pth"],
+          "gb": 0.44
+        }
+      ],
+      "requires_models": [],
+      "weights_gb": 0.44,
+      "runtime_weights_gb": 0.44
+    },
+    {
+      "id": "medsam2",
+      "name": "MedSAM2",
+      "developer": "Univ. of Toronto / UHN (Bo Wang Lab)",
+      "category": "seg",
+      "modality": "mri_ct",
+      "seq_hint": "3D Brain MRI or Head CT treated as slice-propagated volume",
+      "runner": "segment3d",
+      "arch": "SAM-2.1 Hiera + Memory Bank",
+      "embed_dim": null,
+      "voxel_spec": "512×512 slice stack",
+      "hf_repo": "wanglab/MedSAM2",
+      "link": "https://huggingface.co/wanglab/MedSAM2",
+      "licence": "Apache-2.0",
+      "commercial_use": true,
+      "gated": false,
+      "tasks": ["segment_brain"],
+      "source": "HF+GH+Paper",
+      "notes": "Adapts SAM 2 memory-attention propagation to 3D medical volumes; prompt one central brain slice and propagate lesion contours through the entire NIfTI stack.",
+      "paper_label": "arXiv:2408.03322",
+      "paper_url": "https://arxiv.org/abs/2408.03322",
+      "citation": "Zhu, Ma, Wang et al., Medical SAM 2: Segment medical images as video via Segment Anything Model 2, arXiv:2408.03322 (2024)",
+      "weights": [
+        {
+          "via": "hf",
+          "repo": "wanglab/MedSAM2",
+          "type": "model",
+          "files": ["MedSAM2_latest.pt"],
+          "gb": 0.16
+        }
+      ],
+      "requires_models": [],
+      "weights_gb": 0.16,
+      "runtime_weights_gb": 0.16
+    },
+    {
+      "id": "totalseg_mri",
+      "name": "TotalSegmentator (Brain MRI & CT)",
+      "developer": "Univ. Hospital Basel (Wasserthal Lab)",
+      "category": "seg",
+      "modality": "mri_ct",
+      "seq_hint": "3D Brain/Head MRI or Cranial CT (NIfTI)",
+      "runner": "segment3d",
+      "arch": "nnU-Net Ensemble (`total_mr` / `head_glands_cavities` / `brain_structures`)",
+      "embed_dim": null,
+      "voxel_spec": "1.5 mm / 3.0 mm fast mode",
+      "hf_repo": null,
+      "link": "https://github.com/wasserth/TotalSegmentator",
+      "licence": "Apache-2.0",
+      "commercial_use": true,
+      "gated": false,
+      "tasks": ["segment_brain"],
+      "source": "GH+Paper",
+      "notes": "Turnkey `pip install TotalSegmentator` CLI & Python library with dedicated `brain_structures`, `ventricle_parts`, and `total_mr` sub-tasks.",
+      "paper_label": "Radiology: AI 2023 / arXiv:2405.19492",
+      "paper_url": "https://doi.org/10.1148/ryai.230024",
+      "citation": "Wasserthal et al. / Akinci D'Antonoli et al., TotalSegmentator CT & MRI: Robust Segmentation of Anatomical Structures, Radiology: AI (2023 / 2024)",
+      "weights": [
+        {
+          "via": "external",
+          "url": "https://github.com/wasserth/TotalSegmentator",
+          "note": "pip install TotalSegmentator — weights download automatically into ~/.totalsegmentator on first run.",
+          "gb": null
+        }
+      ],
+      "requires_models": [],
+      "weights_gb": 0.24,
+      "runtime_weights_gb": 0.24
+    },
+    {
+      "id": "brainfm_jhu",
+      "name": "BrainFM (Modality-Agnostic)",
+      "developer": "Johns Hopkins Univ. (Liu Lab)",
+      "category": "morph",
+      "modality": "mri_ct",
+      "seq_hint": "Any 3D Brain MRI (T1w, T2w, FLAIR) or Head CT",
+      "runner": "morph_synth",
+      "arch": "Unified 3D Multi-Task Backbone",
+      "embed_dim": null,
+      "voxel_spec": "1 mm isotropic 3D",
+      "hf_repo": null,
+      "link": "https://github.com/jhuldr/BrainFM",
+      "licence": "MIT / Academic",
+      "commercial_use": false,
+      "gated": false,
+      "tasks": ["synth_register", "segment_brain"],
+      "source": "GH+Paper",
+      "notes": "Single modality-agnostic foundation model handling cross-modality brain synthesis (T1w ↔ T2w ↔ FLAIR ↔ CT), bias-field estimation, registration, and cortical distance mapping.",
+      "paper_label": "arXiv:2509.00549",
+      "paper_url": "https://arxiv.org/abs/2509.00549",
+      "citation": "Liu et al., BrainFM: A Modality-agnostic Multi-task Foundation Model for Human Brain Imaging, arXiv:2509.00549 (2025)",
+      "weights": [
+        {
+          "via": "external",
+          "url": "https://github.com/jhuldr/BrainFM",
+          "note": "Clone jhuldr/BrainFM and download pretrained multi-task checkpoint per its README (set brainfm_repo in config.yaml).",
+          "gb": null
+        }
+      ],
+      "requires_models": [],
+      "weights_gb": 0.52,
+      "runtime_weights_gb": 0.52
+    },
+    {
+      "id": "brainmorph",
+      "name": "BrainMorph",
+      "developer": "Cornell Univ. & MGH",
+      "category": "morph",
+      "modality": "mri_multi",
+      "seq_hint": "Moving & fixed 3D Brain MRI (or register to MNI152 template)",
+      "runner": "morph_synth",
+      "arch": "3D Keypoint Detector + Deformation Solver",
+      "embed_dim": null,
+      "voxel_spec": "160×192×224 @ 1 mm",
+      "hf_repo": null,
+      "link": "https://github.com/alanqrwang/brainmorph",
+      "licence": "MIT",
+      "commercial_use": true,
+      "gated": false,
+      "tasks": ["synth_register"],
+      "source": "GH+Paper",
+      "notes": "Foundational 3D keypoint registration model trained on >100,000 normal and lesioned brain MRIs; supports rigid, affine, and diffeomorphic nonlinear alignment in milliseconds.",
+      "paper_label": "MELBA 2025 / arXiv:2405.14019",
+      "paper_url": "https://doi.org/10.59275/j.melba.2025-59g7",
+      "citation": "Wang et al., BrainMorph: A Foundational Keypoint Model for Robust and Flexible Brain MRI Registration, MELBA (2025)",
+      "weights": [
+        {
+          "via": "external",
+          "url": "https://github.com/alanqrwang/brainmorph",
+          "note": "Clone alanqrwang/brainmorph and place keypoint weights in backend/external/brainmorph.",
+          "gb": null
+        }
+      ],
+      "requires_models": [],
+      "weights_gb": 0.28,
+      "runtime_weights_gb": 0.28
+    },
+    {
+      "id": "brainlm",
+      "name": "BrainLM (650M)",
+      "developer": "Yale & Baylor (van Dijk Lab)",
+      "category": "fmri",
+      "modality": "fmri",
+      "seq_hint": "Parcellated 4D resting-state or task fMRI timeseries (AAL-424 parcels)",
+      "runner": "fmri_decode",
+      "arch": "Spatiotemporal ViTMAE (650M)",
+      "embed_dim": 1280,
+      "voxel_spec": "424 parcels × 200 TRs",
+      "hf_repo": "vandijklab/brainlm",
+      "link": "https://huggingface.co/vandijklab/brainlm",
+      "licence": "MIT / Apache-2.0",
+      "commercial_use": true,
+      "gated": false,
+      "tasks": ["decode_fmri", "embed_volumes"],
+      "source": "HF+GH+Paper",
+      "notes": "Trained on 6,700 hours of UK Biobank & HCP 4D fMRI recordings via masked spatio-temporal prediction; decodes intrinsic networks, future brain states, and cognitive phenotypes.",
+      "paper_label": "ICLR / bioRxiv 2024",
+      "paper_url": "https://doi.org/10.1101/2023.09.12.557460",
+      "citation": "Ortega Caro, Fonseca, van Dijk et al., BrainLM: A foundation model for brain activity recordings, ICLR / bioRxiv (2024)",
+      "weights": [
+        {
+          "via": "hf",
+          "repo": "vandijklab/brainlm",
+          "type": "model",
+          "files": ["vitmae_650M/config.json", "vitmae_650M/pytorch_model.bin"],
+          "gb": 2.48
+        }
+      ],
+      "requires_models": [],
+      "weights_gb": 2.48,
+      "runtime_weights_gb": 2.48
+    },
+    {
+      "id": "braingfm",
+      "name": "BrainGFM",
+      "developer": "Multi-Atlas Brain Graph Consortium",
+      "category": "fmri",
+      "modality": "fmri",
+      "seq_hint": "Functional connectivity graph or parcellated BOLD fMRI across any brain atlas",
+      "runner": "fmri_decode",
+      "arch": "Graph MAE + Language-Prompted GNN",
+      "embed_dim": 512,
+      "voxel_spec": "Any parcellation atlas (Schaefer / AAL / MMP)",
+      "hf_repo": null,
+      "link": "https://arxiv.org/abs/2506.02044",
+      "licence": "Academic Research",
+      "commercial_use": false,
+      "gated": false,
+      "tasks": ["decode_fmri"],
+      "source": "Paper",
+      "notes": "Pretrained across diverse anatomical and functional brain atlases with meta-learned graph prompts and text disorder descriptions for cross-atlas connectome diagnosis.",
+      "paper_label": "arXiv:2506.02044",
+      "paper_url": "https://arxiv.org/abs/2506.02044",
+      "citation": "BrainGFM Team, A Brain Graph Foundation Model: Pre-Training and Prompt-Tuning across Broad Atlases and Disorders, arXiv:2506.02044 (2025)",
+      "weights": [
+        {
+          "via": "external",
+          "url": "https://arxiv.org/abs/2506.02044",
+          "note": "Download BrainGFM checkpoint from the authors' code release linked in arXiv:2506.02044.",
+          "gb": null
+        }
+      ],
+      "requires_models": [],
+      "weights_gb": 0.22,
+      "runtime_weights_gb": 0.22
+    }
+  ],
+  "benchmarks": [
+    {
+      "id": "brats",
+      "name": "BraTS (Glioma, Meningioma, Metastases & Africa)",
+      "modality": "4-ch mpMRI (T1, T1ce, T2, FLAIR)",
+      "scope": "Gold-standard 3D brain tumor sub-region segmentation & radiogenomic (IDH / MGMT) benchmark",
+      "paper_label": "IEEE TMI / arXiv:2107.02314",
+      "paper_url": "https://arxiv.org/abs/2107.02314",
+      "data_url": "https://www.synapse.org/brats"
+    },
+    {
+      "id": "fomo_mri",
+      "name": "FOMO-MRI (FOMO45K / FOMO60K / MICCAI Challenge)",
+      "modality": "Multi-sequence 3D Brain MRI",
+      "scope": "Standardized multi-center open pretraining & few-shot transfer benchmark for 3D Brain MRI foundation models",
+      "paper_label": "Hugging Face / MICCAI 2025",
+      "paper_url": "https://huggingface.co/FOMO-MRI",
+      "data_url": "https://huggingface.co/datasets/FOMO-MRI/FOMO60K"
+    },
+    {
+      "id": "atlas_stroke",
+      "name": "ATLAS v2.0 & ISLES",
+      "modality": "T1w / DWI / ADC / FLAIR Stroke MRI",
+      "scope": "955+ T1w chronic stroke lesion masks (ATLAS v2.0) and acute ischemic stroke DWI/perfusion challenges (ISLES)",
+      "paper_label": "Sci. Data 2022",
+      "paper_url": "https://doi.org/10.1038/s41597-022-01401-7",
+      "data_url": "https://fcon_1000.projects.nitrc.org/indi/retro/atlas.html"
+    },
+    {
+      "id": "rsna_cq500",
+      "name": "RSNA Intracranial Hemorrhage & CQ500",
+      "modality": "Non-Contrast Head CT",
+      "scope": "25,000+ annotated cranial CT studies (RSNA) and 491 multi-reader emergency head CT scans (CQ500) for ICH, midline shift & fracture",
+      "paper_label": "Lancet 2018 / Radiology: AI",
+      "paper_url": "https://doi.org/10.1016/S0140-6736(18)31645-3",
+      "data_url": "https://headctstudy.qure.ai/dataset"
+    },
+    {
+      "id": "adni_oasis",
+      "name": "ADNI, OASIS-3/4 & OpenNeuro",
+      "modality": "Structural MRI, Amyloid/Tau PET & fMRI",
+      "scope": "Longitudinal neurodegeneration, MCI-to-Alzheimer's progression, BrainAge, and open BIDS neuroimaging archives",
+      "paper_label": "Sci. Data / OpenNeuro",
+      "paper_url": "https://doi.org/10.1101/2019.12.13.19014902",
+      "data_url": "https://openneuro.org/"
+    },
+    {
+      "id": "ukb_hcp",
+      "name": "UK Biobank Brain & Human Connectome Project",
+      "modality": "T1w, T2-FLAIR, dMRI, rfMRI, tfMRI",
+      "scope": "Population-scale multimodal brain imaging (>80,000 participants) powering BrainSegFounder, BrainLM, and Brain2Vec",
+      "paper_label": "Nature Neurosci. 2016",
+      "paper_url": "https://doi.org/10.1038/nn.4393",
+      "data_url": "https://www.ukbiobank.ac.uk/"
+    },
+    {
+      "id": "m3d_radbench",
+      "name": "M3D-Bench & RadBench",
+      "modality": "3D MRI & CT + Radiology Text",
+      "scope": "Comprehensive evaluation suites for 3D radiological VQA, abnormality recognition, report generation, and 3D grounding",
+      "paper_label": "arXiv:2404.00578",
+      "paper_url": "https://arxiv.org/abs/2404.00578",
+      "data_url": "https://huggingface.co/datasets/GoodBaiBai88/M3D-VQA"
+    },
+    {
+      "id": "fastmri_brain",
+      "name": "fastMRI Brain",
+      "modality": "Raw k-space & DICOM Brain MRI (T1, T2, FLAIR)",
+      "scope": "NYU Langone & Meta AI open dataset of >6,900 brain MRI exams for accelerated reconstruction and pathology-aware synthesis",
+      "paper_label": "arXiv:1811.08839",
+      "paper_url": "https://arxiv.org/abs/1811.08839",
+      "data_url": "https://fastmri.med.nyu.edu/"
+    }
+  ],
+  "literature_references": [
+    {
+      "name": "Med-Gemini-3D / Med-PaLM M",
+      "developer": "Google Research & DeepMind",
+      "scope": "Large proprietary multimodal medical foundation models supporting 3D Head CT report generation & generalist radiology VQA (closed weights — benchmark reference; see open-weight MedGemma above)",
+      "status": "Proprietary / Closed weights",
+      "paper_label": "arXiv:2405.03162",
+      "paper_url": "https://arxiv.org/abs/2405.03162"
+    },
+    {
+      "name": "MONAI & MONAI Model Zoo",
+      "developer": "Project MONAI Consortium",
+      "scope": "PyTorch-based open-source framework powering NIfTI/DICOM volumetric transforms, sliding-window 3D inference, SwinUNETR, SegResNet, and VISTA3D",
+      "status": "Open-source neuroimaging engine",
+      "paper_label": "arXiv:2211.02701",
+      "paper_url": "https://github.com/Project-MONAI/MONAI"
+    },
+    {
+      "name": "FreeSurfer 8 & SynthMorph",
+      "developer": "MGH / Harvard Martinos Center",
+      "scope": "Reference neuroimaging suite integrating SynthSeg, SynthStrip (skull-stripping FM), SynthSR (clinical MRI super-resolution), and SynthMorph",
+      "status": "Open neuroimaging suite",
+      "paper_label": "NeuroImage / MedIA",
+      "paper_url": "https://surfer.nmr.mgh.harvard.edu/"
+    },
+    {
+      "name": "BIDS, NiBabel & 3D Slicer",
+      "developer": "Open Neuroimaging Community",
+      "scope": "Brain Imaging Data Structure (BIDS) standard, NIfTI Python I/O (`nibabel`), and interactive desktop 3D visualization for `.nii.gz` masks exported by this portal",
+      "status": "Interoperable standards",
+      "paper_label": "Sci. Data 2016",
+      "paper_url": "https://doi.org/10.1038/sdata.2016.44"
+    }
+  ],
+  "hardware_rules": {
+    "source": "Portal rule of thumb based on 3D volume activations + FP16/BF16 model weights. Replaced by measured speed & peak VRAM once a model runs on your server.",
+    "tiers": [
+      {
+        "id": "small",
+        "max_gb": 0.5,
+        "label": "CPU / 6 GB GPU",
+        "cpu": "Runs on CPU for single 3D NIfTI volumes (~10–45 s); fast on any 6+ GB GPU."
+      },
+      {
+        "id": "medium",
+        "max_gb": 2.6,
+        "label": "8–12 GB GPU",
+        "cpu": "Runs on CPU slowly for single scans; an 8–12 GB CUDA GPU is recommended for 3D sliding-window inference."
+      },
+      {
+        "id": "large",
+        "max_gb": 10.0,
+        "label": "16–24 GB GPU",
+        "cpu": "Multimodal 4B–7B 3D VLM; use a 16–24 GB GPU (RTX 4090, L4, A10G) or 4-bit quantization."
+      },
+      {
+        "id": "xlarge",
+        "max_gb": 1000000000.0,
+        "label": "24–48+ GB GPU",
+        "cpu": "Large 3D radiology VLM; requires a 24–48+ GB GPU (A6000, L40S, A100) or vLLM tensor parallelism."
+      }
+    ],
+    "vram_headroom_gb": 2.5,
+    "ram_factor": 2.0
+  }
+}

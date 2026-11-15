@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Brain Radiology FM Portal — NeuroRad-FM</title>
+<meta name="description" content="Run 28 open-weight 3D brain MRI, head CT, PET, and 4D fMRI foundation models — volumetric encoders (NeuroVFM, Neuro-JEPA, BrainFound, BrainIAC, Brain2Vec, NeuroFM, CT-FM), neuro vision–language report & triage models (NeuroVFM-LLM, Brainfound, BrainGemma3D, M3D-LaMed, MedGemma, RadFM), 3D segmentation (BrainSegFounder, SynthSeg, FastSurferVINN, VISTA3D, nnInteractive, MedSAM2), cross-modal synthesis/registration (BrainFM, BrainMorph), and fMRI connectomics (BrainLM, BrainGFM) — with verified paper links.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230c1824'/%3E%3Cellipse cx='16' cy='16' rx='10.5' ry='12' fill='none' stroke='%2338bdf8' stroke-width='2.2'/%3E%3Cpath d='M16 5v22M10.5 11.5c2 1.2 2.5 3.5 1 5.5s-1 4.2 1.5 5.2M21.5 11.5c-2 1.2-2.5 3.5-1 5.5s1 4.2-1.5 5.2' fill='none' stroke='%2338bdf8' stroke-width='1.7' stroke-linecap='round'/%3E%3Ccircle cx='20.5' cy='13.5' r='2.3' fill='%23f59e0b'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,500..800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<header class="top">
+  <div class="top-inner">
+    <a class="brand" href="#models" aria-label="Brain Radiology FM Portal home">
+      <span class="brand-mark" aria-hidden="true">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+          <ellipse cx="12" cy="12" rx="8.2" ry="9.5" stroke="currentColor" stroke-width="1.9"/>
+          <path d="M12 3.2v17.6M8 8.6c1.5.9 1.8 2.6.7 4.2-.9 1.4-.6 3.1 1.2 3.8M16 8.6c-1.5.9-1.8 2.6-.7 4.2.9 1.4.6 3.1-1.2 3.8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+          <circle cx="15.5" cy="10.2" r="1.9" fill="var(--accent-warm)"/>
+        </svg>
+      </span>
+      <span class="brand-name">Brain Radiology FM Portal</span>
+    </a>
+    <nav class="tabs" aria-label="Sections">
+      <button data-view="models">Models</button>
+      <button data-view="run">Run</button>
+      <button data-view="results">Results</button>
+      <button data-view="papers">Papers</button>
+      <button data-view="connect">Connect</button>
+    </nav>
+    <div class="conn">
+      <button class="pill" id="connPill" data-view="connect" aria-live="polite"><span class="dot" id="connDot"></span><span id="connText">Not connected</span></button>
+      <button class="icon-btn" id="themeBtn" aria-label="Switch light or PACS darkroom theme" title="Lightbox / PACS reading room">
+        <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.5" fill="none" stroke="currentColor"/><path d="M8 1.5a6.5 6.5 0 0 1 0 13z" fill="currentColor"/></svg>
+      </button>
+    </div>
+  </div>
+</header>
+
+<main>
+  <!-- ═════════════ MODELS ═════════════ -->
+  <section id="view-models" aria-labelledby="h-models">
+    <div class="intro">
+      <div>
+        <h1 id="h-models">Open-weight brain MRI, head CT &amp; fMRI foundation models on one PACS bench.</h1>
+        <p>Select a 3D neuroimaging foundation model, feed it NIfTI volumes (<code>.nii</code> / <code>.nii.gz</code>), DICOM series, or slice stacks, and inspect the output its training was built for: 3D patient embeddings, BrainAge &amp; morphometry, urgent MRI/CT diagnostic triage, structured neuroradiology reports, tri-planar parcellation &amp; lesion masks, cross-sequence synthesis, or 4D fMRI functional networks — with verified links to every paper. Inference runs on your own workstation or GPU server; this static page never touches patient scans.</p>
+      </div>
+      <div class="counts" id="counts"></div>
+    </div>
+    <div class="hw-bar" id="hwBar" aria-live="polite"></div>
+    <div class="cat-layout">
+      <aside class="filters" aria-label="Filter models">
+        <div>
+          <label class="sr-only" for="q">Search models</label>
+          <input id="q" class="search" type="search" placeholder="Search model, lab, MRI/CT, BraTS or DOI">
+        </div>
+        <div>
+          <h3>Model family</h3>
+          <ul class="fam-list" id="famList"></ul>
+        </div>
+        <div>
+          <h3>Modality &amp; scope</h3>
+          <ul class="fam-list" id="modList"></ul>
+        </div>
+        <div>
+          <h3>Access &amp; fit</h3>
+          <label class="check"><input type="checkbox" id="fCommercial"> Commercial use allowed</label>
+          <label class="check"><input type="checkbox" id="fUngated"> No Hugging Face access request</label>
+          <label class="check"><input type="checkbox" id="fReady"> Ready on my server</label>
+          <label class="check"><input type="checkbox" id="fHw"> Suits my hardware</label>
+        </div>
+        <p class="small muted">Weights, voxel geometry, and licences verified on <span id="regDate"></span> against Hugging Face model cards, official GitHub repositories, and peer-reviewed preprints/DOIs. Always review individual model licences before clinical research deployment.</p>
+      </aside>
+      <div id="rack"></div>
+    </div>
+  </section>
+
+  <!-- ═════════════ RUN ═════════════ -->
+  <section id="view-run" aria-labelledby="h-run" hidden>
+    <h2 id="h-run" style="margin-bottom:6px">Run a neuroimaging model</h2>
+    <p class="muted">Jobs queue on your local/remote GPU server (or run instantaneously in browser Demo mode with an analytical 3D brain phantom).</p>
+    <div class="run-layout">
+      <form id="runForm" autocomplete="off">
+        <div class="step"><span class="step-n">1</span><div>
+          <h3>Model</h3>
+          <div class="field"><label for="rModel">Foundation model</label><select id="rModel" required></select>
+            <span class="hint" id="rModelHint"></span></div>
+        </div></div>
+        <div class="step"><span class="step-n">2</span><div>
+          <h3>Task</h3>
+          <div class="seg-ctl" id="rTasks" role="group" aria-label="Task"></div>
+          <div id="rTaskDesc" class="small muted"></div>
+        </div></div>
+        <div class="step"><span class="step-n">3</span><div>
+          <h3 id="rInputTitle">Input scan</h3>
+          <div id="multiVolInput">
+            <label class="drop" id="drop" tabindex="0">
+              <input type="file" id="volFiles" accept=".nii,.gz,.dcm,.png,.jpg,.jpeg,.tif,.tiff" multiple hidden>
+              <strong>Drop cohort NIfTI volumes or key slices here</strong> or choose files<br><span class="small"><code>.nii.gz</code>, <code>.nii</code>, <code>.dcm</code>, or PNG/TIFF slice exports. Each volume is resampled to the encoder's voxel grid.</span>
+            </label>
+            <div class="thumbs" id="volThumbs"></div>
+          </div>
+          <div id="singleVolInput" hidden>
+            <div class="seg-ctl" role="group" aria-label="Volume source">
+              <button type="button" data-src="path" aria-pressed="true">Path on server</button>
+              <button type="button" data-src="upload" aria-pressed="false">Upload NIfTI / slice</button>
+            </div>
+            <div class="field" id="volPathField"><label for="volPath">Scan path on the backend machine</label>
+              <input type="text" id="volPath" placeholder="/data/neuro/sub-01/anat/sub-01_T1w.nii.gz">
+              <span class="hint">Must reside inside a directory listed in <code>allowed_scan_roots</code> in <code>backend/config.yaml</code>. Ideal for multi-sequence BIDS folders or 4D fMRI.</span></div>
+            <div class="field" id="volUploadField" hidden><label for="volFile">3D NIfTI volume or radiological slice</label>
+              <input type="file" id="volFile" accept=".nii,.gz,.dcm,.png,.jpg,.jpeg,.tif,.tiff">
+              <span class="hint">Sent directly to your own backend server (never to GitHub). Standard compressed NIfTI (<code>.nii.gz</code>) is 5–40 MB.</span></div>
+          </div>
+        </div></div>
+        <div class="step"><span class="step-n">4</span><div>
+          <h3>Clinical &amp; inference settings</h3>
+          <div id="rParams"></div>
+        </div></div>
+        <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding-top:6px">
+          <button class="btn" id="runBtn" type="submit">Run model</button>
+          <span id="runMsg" class="small" role="status"></span>
+        </div>
+      </form>
+      <div class="aside" id="runAside"></div>
+    </div>
+  </section>
+
+  <!-- ═════════════ RESULTS ═════════════ -->
+  <section id="view-results" aria-labelledby="h-res" hidden>
+    <h2 id="h-res" class="sr-only">Results</h2>
+    <div class="res-layout">
+      <div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <h3>Studies &amp; jobs</h3><button class="btn ghost small" id="refreshJobs" type="button">Refresh</button>
+        </div>
+        <ul class="joblist" id="jobList"></ul>
+      </div>
+      <div id="jobView" aria-live="polite"></div>
+    </div>
+  </section>
+
+  <!-- ═════════════ PAPERS & BENCHMARKS ═════════════ -->
+  <section id="view-papers" aria-labelledby="h-papers" hidden>
+    <div class="intro">
+      <div>
+        <h2 id="h-papers" style="margin-bottom:6px">Papers, BibTeX &amp; neuroimaging benchmarks</h2>
+        <p class="muted">Verified journal DOIs, arXiv/medRxiv preprints, and one-click BibTeX citations for all 28 open-weight brain radiology foundation models, alongside standard neuroimaging challenges (BraTS, FOMO-MRI, ATLAS, RSNA ICH, ADNI/OpenNeuro, UK Biobank) and ecosystem references.</p>
+      </div>
+    </div>
+    <div id="papersView"></div>
+  </section>
+
+  <!-- ═════════════ CONNECT ═════════════ -->
+  <section id="view-connect" aria-labelledby="h-conn" hidden>
+    <h2 id="h-conn" style="margin-bottom:6px">Connect a neuroimaging backend</h2>
+    <p class="muted">GitHub Pages hosts this static workstation UI. Real 3D NIfTI / DICOM inference runs inside the lightweight FastAPI server in <code>backend/</code> on your local workstation, hospital research server, or cloud GPU.</p>
+    <div class="connect-layout">
+      <form id="connForm" autocomplete="off">
+        <div class="mode-cards" role="radiogroup" aria-label="Mode">
+          <label><input type="radio" name="mode" value="server" checked><strong>My GPU server</strong>
+            <span class="d">Real 3D NIfTI / DICOM inference on your workstation, hospital cluster, or cloud GPU.</span></label>
+          <label><input type="radio" name="mode" value="demo"><strong>Interactive Demo</strong>
+            <span class="d">Analytical 3D brain phantom &amp; synthetic outputs rendered right in your browser — zero setup.</span></label>
+        </div>
+        <div id="serverFields">
+          <div class="field"><label for="cUrl">Backend URL</label><input type="url" id="cUrl" placeholder="http://127.0.0.1:8000">
+            <span class="hint">Local server: <code>http://127.0.0.1:8000</code>. Remote GPU node: use SSH port-forwarding (<code>ssh -L 8000:127.0.0.1:8000</code>) or an HTTPS tunnel.</span></div>
+          <div class="field"><label for="cKey">Portal key</label><input type="password" id="cKey" placeholder="Same as portal_key in config.yaml">
+            <label class="check"><input type="checkbox" id="cRemember"> Remember the key on this device</label></div>
+          <div class="field"><label for="cHf">Hugging Face token (optional)</label><input type="password" id="cHf" placeholder="hf_…">
+            <span class="hint">Used for gated clinical neuroimaging repos (e.g. <code>mlinslab/neurovfm-*</code>, <code>NYUMedML/Neuro-JEPA</code>, <code>cbica/Brain2Vec</code>, <code>google/medgemma-4b-it</code>). Kept in session memory only, or run <code>hf auth login</code> on the server.</span></div>
+        </div>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <button class="btn" type="submit">Connect</button>
+          <span id="connMsg" class="small" role="status"></span>
+        </div>
+      </form>
+      <div class="aside">
+        <div class="card" id="serverStatus"><h3>Server status</h3><p class="muted small">Connect to inspect CUDA GPUs, NiBabel/MONAI packages, and cached model weights.</p></div>
+        <div class="card" id="launchCard"></div>
+      </div>
+    </div>
+    <div class="card" id="weightsCard" hidden style="margin-top:28px"></div>
+  </section>
+</main>
+
+<footer>
+  <strong>Research Use Only</strong> — not cleared or intended for primary diagnostic or clinical decision-making. Always de-identify DICOM/NIfTI headers and check each model's licence before use.
+  Powered by <a href="https://nipy.org/nibabel/" target="_blank" rel="noopener">NiBabel</a>, <a href="https://monai.io/" target="_blank" rel="noopener">Project MONAI</a> &amp; <a href="https://huggingface.co/" target="_blank" rel="noopener">Hugging Face Hub</a>.
+</footer>
+
+<dialog class="drawer" id="drawer" aria-labelledby="drawerTitle"></dialog>
+
+<script src="assets/viewers.js"></script>
+<script src="assets/hardware.js"></script>
+<script src="assets/demo.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>
