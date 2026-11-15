@@ -27,15 +27,7 @@ An open-source, GitHub Pages-ready graphical workstation and local GPU inference
 
 ## 🚀 Quickstart
 
-### 1. Publish on GitHub Pages (Zero Build Step)
-
-1. Push this repository to GitHub.
-2. Go to **Settings → Pages**:
-   - **Option A (GitHub Actions — included)**: Choose **Source: GitHub Actions** (uses `.github/workflows/pages.yml`).
-   - **Option B (Branch deploy)**: Choose **Deploy from a branch** → Branch `main` → Folder `/docs`.
-3. Open your published URL — **Interactive Demo Mode** works immediately in the browser with no GPU required!
-
-### 2. Run Locally (Static UI + FastAPI Backend)
+### 1. Run Locally (Static UI + FastAPI Backend)
 
 ```bash
 # Terminal 1 — Serve the static frontend
@@ -88,3 +80,6 @@ Brain_Radiology_FM_Portal/
 ## ⚠️ Disclaimer
 
 **Research Use Only.** Neither this portal nor the underlying open-weight models are cleared or approved for clinical diagnostic use or patient management. Always strip Protected Health Information (PHI) from DICOM headers (e.g., via `dcm2niix -ba y`) and verify each model's licence before use.
+Created and curated by Prajwal Ghimire
+Copyright @Prajwal Ghimire
+Contact: prajwal.ghimire@crick.ac.uk
