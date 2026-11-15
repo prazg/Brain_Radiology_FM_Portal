@@ -1,0 +1,25 @@
+name: Backend CI & Registry Check
+
+on:
+  push:
+    branches: ["main", "master"]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: backend/requirements-server.txt
+
+      - name: Install backend server dependencies
+        run: pip install -r backend/requirements-server.txt
+
+      - name: Validate models.json & run 28-model mock test suite
+        run: pytest backend/tests/test_api_mock.py -v
