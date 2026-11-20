@@ -1,11 +1,12 @@
 /* Brain Radiology FM Portal — Neuroradiology Lightbox & PACS Reading Room */
 :root {
+  color-scheme: light;
   --bg:        #f4f7f9;
   --surface:   #ffffff;
   --subtle:    #eaeff4;
   --ink:       #0f1923;
   --ink-2:     #36495a;
-  --ink-3:     #647789;
+  --ink-3:     #4f6274;
   --line:      #d5dfe8;
   --line-2:    #bac9d6;
   --accent:    #0c7792;          /* cortical teal / cyan */
@@ -36,12 +37,13 @@
 }
 
 [data-theme="dark"] {
+  color-scheme: dark;
   --bg:        #0a1017;
   --surface:   #111a24;
   --subtle:    #172331;
   --ink:       #e7eff6;
   --ink-2:     #a8bacb;
-  --ink-3:     #73879b;
+  --ink-3:     #8a9fb4;
   --line:      #203042;
   --line-2:    #2e445c;
   --accent:    #38bdf8;
@@ -81,6 +83,7 @@ h2 { font-size: 1.35rem; font-weight: 700; }
 h3 { font-size: 1.02rem; font-weight: 600; }
 p { margin: 0; }
 button, input, select, textarea { font: inherit; color: inherit; }
+select option, select optgroup { background: var(--surface); color: var(--ink); }
 button { cursor: pointer; }
 [hidden] { display: none !important; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
@@ -148,10 +151,19 @@ main { max-width: var(--max); margin: 0 auto; padding: 28px 24px 72px; }
 
 .filters { position: sticky; top: 76px; display: flex; flex-direction: column; gap: 18px; }
 @media (max-width: 880px) { .filters { position: static; } }
+.search-wrap { position: relative; display: flex; align-items: center; }
 .search {
-  width: 100%; padding: 8px 11px; border-radius: var(--r);
+  width: 100%; padding: 8px 30px 8px 11px; border-radius: var(--r);
   border: 1px solid var(--line-2); background: var(--surface);
 }
+.search:focus { border-color: var(--accent); }
+.kbd-hint {
+  position: absolute; right: 8px; pointer-events: none;
+  font-family: var(--mono); font-size: 0.72rem; line-height: 1;
+  padding: 3px 6px; border-radius: 4px;
+  border: 1px solid var(--line-2); background: var(--subtle); color: var(--ink-3);
+}
+.search:focus + .kbd-hint { opacity: 0; }
 .filters h3 { font-size: 0.76rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-3); font-family: var(--sans); font-weight: 700; margin-bottom: 6px; }
 .fam-list { display: flex; flex-direction: column; gap: 2px; list-style: none; padding: 0; margin: 0; }
 .fam-list button {
@@ -175,9 +187,20 @@ main { max-width: var(--max); margin: 0 auto; padding: 28px 24px 72px; }
 .slide {
   background: var(--surface); border: 1px solid var(--line); border-radius: var(--r);
   display: grid; grid-template-columns: 7px 1fr; overflow: hidden;
-  transition: border-color 120ms ease, transform 120ms ease;
+  transition: border-color 140ms ease, box-shadow 140ms ease, transform 140ms ease;
 }
-.slide:hover { border-color: var(--line-2); }
+.slide:hover {
+  border-color: var(--line-2);
+  box-shadow: 0 4px 14px rgba(12, 24, 36, 0.06);
+}
+[data-theme="dark"] .slide:hover {
+  border-color: var(--fam, var(--line-2));
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.36);
+}
+.slide.is-pinned {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
 .slide-frosted { background: var(--fam, var(--line-2)); }
 .slide.fam-vol_enc { --fam: var(--fam-vol_enc); }
 .slide.fam-vlm     { --fam: var(--fam-vlm); }
@@ -471,6 +494,141 @@ footer {
 .w-table-wrap { overflow-x: auto; max-height: 480px; overflow-y: auto; border: 1px solid var(--line); border-radius: var(--r); }
 .w-table th { position: sticky; top: 0; background: var(--surface); z-index: 1; }
 .w-table td { vertical-align: middle; }
+
+/* ── Clinical Scenario Quick-Filter Chips & Rack Export Toolbar ──────────── */
+.rack-col { min-width: 0; display: flex; flex-direction: column; gap: 14px; }
+.scenario-bar {
+  display: flex; flex-wrap: wrap; gap: 7px; align-items: center;
+  padding: 10px 12px; border-radius: var(--r);
+  background: var(--surface); border: 1px solid var(--line);
+}
+.scenario-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 5px 11px; border-radius: 999px;
+  border: 1px solid var(--line-2); background: var(--subtle);
+  color: var(--ink-2); font-size: 0.81rem; font-weight: 700;
+  white-space: nowrap; transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+.scenario-chip:hover { border-color: var(--accent); color: var(--ink); background: var(--surface); }
+.scenario-chip[aria-pressed="true"] {
+  background: var(--accent-bg); border-color: var(--accent); color: var(--accent);
+}
+.scenario-chip .chip-n {
+  font-family: var(--mono); font-size: 0.72rem; font-weight: 500;
+  padding: 1px 5px; border-radius: 999px;
+  background: var(--surface); color: var(--ink-3);
+}
+.scenario-chip[aria-pressed="true"] .chip-n { color: var(--accent); }
+
+.rack-toolbar {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+  gap: 10px 16px; font-size: 0.84rem; color: var(--ink-2);
+}
+.rack-status { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.rack-exports { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+/* ── Pin-to-Compare Card Toggle & Floating Dock ──────────────────────────── */
+.pin-btn {
+  flex: none; display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 8px; border-radius: 999px;
+  border: 1px solid var(--line-2); background: var(--subtle);
+  color: var(--ink-2); font-size: 0.73rem; font-weight: 700;
+  transition: border-color 120ms ease, background-color 120ms ease, color 120ms ease;
+}
+.pin-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--surface); }
+.pin-btn[aria-pressed="true"] {
+  background: var(--accent-bg); border-color: var(--accent); color: var(--accent);
+}
+
+.hw-profile-wrap {
+  margin-left: auto; display: inline-flex; align-items: center; gap: 7px;
+  font-size: 0.8rem; color: var(--ink-2);
+}
+.hw-profile-sel {
+  padding: 3px 8px; border-radius: 5px; border: 1px solid var(--line-2);
+  background: var(--subtle); color: var(--ink); font-size: 0.8rem;
+}
+
+body.has-cmp-dock footer { padding-bottom: 104px; }
+
+.cmp-dock {
+  position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%);
+  z-index: 25; width: min(980px, calc(100vw - 24px));
+  background: var(--surface); border: 1.5px solid var(--accent);
+  border-radius: 10px; padding: 10px 14px;
+  box-shadow: 0 12px 32px rgba(5, 12, 22, 0.28);
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 14px;
+}
+.cmp-dock-list { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 0; }
+.cmp-dock-title { font-family: var(--display); font-weight: 700; font-size: 0.88rem; margin-right: 4px; }
+.cmp-pill {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 3px 8px; border-radius: 999px;
+  background: var(--subtle); border: 1px solid var(--line-2);
+  font-size: 0.79rem; color: var(--ink);
+}
+.cmp-pill button {
+  background: none; border: 0; padding: 0 2px; color: var(--ink-3);
+  font-size: 0.8rem; line-height: 1;
+}
+.cmp-pill button:hover { color: var(--bad); }
+.cmp-dock-actions { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; margin-left: auto; }
+.cmp-dock-msg { width: 100%; font-size: 0.79rem; color: var(--warn); }
+
+/* ── Side-by-Side 3D Model Comparison Modal ──────────────────────────────── */
+dialog.cmp-modal {
+  margin: auto; width: min(1160px, calc(100vw - 24px)); max-height: min(88dvh, 880px);
+  border: 1px solid var(--line-2); border-radius: 10px; padding: 0;
+  background: var(--surface); color: var(--ink);
+  box-shadow: 0 20px 50px rgba(4, 10, 18, 0.45);
+}
+dialog.cmp-modal::backdrop { background: rgba(6, 12, 20, 0.62); }
+.cmp-modal-in {
+  padding: 20px 22px; display: flex; flex-direction: column; gap: 14px;
+  max-height: min(88dvh, 880px); overflow: hidden;
+}
+.cmp-modal-head {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px;
+}
+.cmp-modal-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.cmp-add-sel {
+  padding: 5px 9px; border-radius: var(--r); border: 1px solid var(--line-2);
+  background: var(--subtle); font-size: 0.82rem; max-width: 240px;
+}
+.cmp-table-wrap {
+  overflow: auto; border: 1px solid var(--line); border-radius: var(--r); flex: 1 1 auto;
+}
+.cmp-table { width: 100%; border-collapse: collapse; font-size: 0.84rem; min-width: 640px; }
+.cmp-table th, .cmp-table td {
+  padding: 10px 12px; border-bottom: 1px solid var(--line); border-right: 1px solid var(--line);
+  text-align: left; vertical-align: top;
+}
+.cmp-table th:last-child, .cmp-table td:last-child { border-right: 0; }
+.cmp-table thead th {
+  position: sticky; top: 0; z-index: 2; background: var(--subtle);
+  font-size: 0.86rem; text-transform: none; letter-spacing: 0; color: var(--ink);
+}
+.cmp-table tbody th {
+  position: sticky; left: 0; z-index: 1; background: var(--surface);
+  width: 156px; min-width: 140px; color: var(--ink-3); font-weight: 700;
+  font-size: 0.76rem; text-transform: uppercase; letter-spacing: 0.05em;
+}
+.cmp-table thead th:first-child { left: 0; z-index: 3; }
+
+/* ── Responsive Reading-Room Refinements ─────────────────────────────────── */
+@media (max-width: 720px) {
+  .top-inner { padding: 6px 14px; gap: 10px; }
+  .tabs { order: 3; width: 100%; overflow-x: auto; padding-bottom: 2px; border-top: 1px solid var(--line); }
+  .tabs button { padding: 10px 11px; white-space: nowrap; font-size: 0.86rem; }
+  main { padding: 20px 14px 64px; }
+  .hw-profile-wrap { margin-left: 0; width: 100%; }
+}
+@media (max-width: 560px) {
+  .bar-row { grid-template-columns: 1fr auto; gap: 4px 10px; }
+  .bar-row .bar-track { grid-column: 1 / -1; order: 3; }
+  .kv { grid-template-columns: 1fr; gap: 2px; }
+  .kv dd { margin-bottom: 8px; }
+}
 
 /* === PRAZG_SUITE_BANNER_CSS_START === */
 .prazg-suite-bar {

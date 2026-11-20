@@ -29,6 +29,20 @@
     return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
   }
 
+  const ESC_MAP = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
+  function escHtml(s) {
+    return String(s ?? "").replace(/[&<>"']/g, ch => ESC_MAP[ch]);
+  }
+
+  function safeUrl(u) {
+    const s = String(u ?? "").trim();
+    if (!s) return "";
+    if (/^(https?:|blob:|#)/i.test(s)) return s;
+    if (/^data:image\/(png|jpeg|webp|gif|svg\+xml);/i.test(s)) return s;
+    if (!/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(s)) return s;
+    return "#";
+  }
+
   function h(tag, attrs, ...kids) {
     const el = document.createElement(tag);
     if (attrs) for (const [k, v] of Object.entries(attrs)) {
@@ -36,6 +50,7 @@
       if (k === "class") el.className = v;
       else if (k === "style" && typeof v === "object") Object.assign(el.style, v);
       else if (k.startsWith("on")) el.addEventListener(k.slice(2), v);
+      else if (k === "href" || k === "src") el.setAttribute(k, safeUrl(v));
       else el.setAttribute(k, v === true ? "" : v);
     }
     for (const kid of kids.flat()) {
@@ -46,14 +61,18 @@
   }
 
   let tipEl;
+  function hideTip() {
+    if (tipEl) tipEl.hidden = true;
+  }
   function tip(ev, text) {
     if (!tipEl) tipEl = document.body.appendChild(h("div", { class: "tip", hidden: true }));
-    if (!text) { tipEl.hidden = true; return; }
+    if (!text || !ev) { tipEl.hidden = true; return; }
     tipEl.textContent = text;
     tipEl.hidden = false;
-    tipEl.style.left = Math.min(window.innerWidth - 330, ev.clientX + 12) + "px";
-    tipEl.style.top = (ev.clientY + 12) + "px";
+    tipEl.style.left = Math.max(8, Math.min(window.innerWidth - 330, ev.clientX + 12)) + "px";
+    tipEl.style.top = Math.max(8, Math.min(window.innerHeight - 44, ev.clientY + 12)) + "px";
   }
+  window.addEventListener("scroll", hideTip, { passive: true });
 
   function panelShell(title, tools) {
     const body = h("div");
@@ -261,8 +280,8 @@
 
     const xs = pts.map(d => d.x), ys = pts.map(d => d.y);
     const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
-    const sx = x => pad + ((x - x0) / (x1 - x0 || 1)) * (W - 2 * pad);
-    const sy = y => H - pad - ((y - y0) / (y1 - y0 || 1)) * (H - 2 * pad);
+    const sx = x => x1 === x0 ? W / 2 : pad + ((x - x0) / (x1 - x0)) * (W - 2 * pad);
+    const sy = y => y1 === y0 ? H / 2 : H - pad - ((y - y0) / (y1 - y0)) * (H - 2 * pad);
 
     const g = c.getContext("2d");
     const line = getComputedStyle(document.documentElement).getPropertyValue("--line-2").trim() || "#ccc";
@@ -396,6 +415,9 @@
 
   window.Viewers = {
     h,
+    escHtml,
+    safeUrl,
+    hideTip,
     render(panel, ctx) {
       const fn = DISPATCH[panel.type];
       return fn ? fn(panel, ctx) : renderNote({ title: panel.title || panel.type, text: "Unsupported panel type: " + panel.type });

@@ -74,9 +74,10 @@
     <div class="hw-bar" id="hwBar" aria-live="polite"></div>
     <div class="cat-layout">
       <aside class="filters" aria-label="Filter models">
-        <div>
-          <label class="sr-only" for="q">Search models</label>
+        <div class="search-wrap">
+          <label class="sr-only" for="q">Search models (press / to focus)</label>
           <input id="q" class="search" type="search" placeholder="Search model, lab, MRI/CT, BraTS or DOI">
+          <kbd class="kbd-hint" id="qKbdHint" aria-hidden="true" title="Press / to focus search">/</kbd>
         </div>
         <div>
           <h3>Model family</h3>
@@ -95,7 +96,11 @@
         </div>
         <p class="small muted">Weights, voxel geometry, and licences verified on <span id="regDate"></span> against Hugging Face model cards, official GitHub repositories, and peer-reviewed preprints/DOIs. Always review individual model licences before clinical research deployment.</p>
       </aside>
-      <div id="rack"></div>
+      <div class="rack-col">
+        <div class="scenario-bar" id="scenarioChips" role="group" aria-label="Clinical scenario quick-filter chips"></div>
+        <div class="rack-toolbar" id="rackToolbar"></div>
+        <div id="rack"></div>
+      </div>
     </div>
   </section>
 
@@ -214,7 +219,9 @@
   Powered by <a href="https://nipy.org/nibabel/" target="_blank" rel="noopener">NiBabel</a>, <a href="https://monai.io/" target="_blank" rel="noopener">Project MONAI</a> &amp; <a href="https://huggingface.co/" target="_blank" rel="noopener">Hugging Face Hub</a>.
 </footer>
 
+<aside class="cmp-dock" id="compareDock" aria-label="3D model comparator dock" hidden></aside>
 <dialog class="drawer" id="drawer" aria-labelledby="drawerTitle"></dialog>
+<dialog class="cmp-modal" id="compareModal" aria-labelledby="cmpTitle"></dialog>
 
 <script src="assets/viewers.js"></script>
 <script src="assets/hardware.js"></script>

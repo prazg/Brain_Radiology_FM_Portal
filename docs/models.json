@@ -1,5 +1,5 @@
 {
-  "version": "2026-11-15",
+  "version": "2026-11-20",
   "portal": {
     "name": "Brain Radiology FM Portal",
     "short_name": "NeuroRad-FM",
@@ -307,8 +307,8 @@
       "source": "HF+GH+Paper",
       "notes": "Disease-naive 11M-parameter model runnable even on CPU; estimates individualized BrainAge, total brain volume, lateral ventricle volume, and biological sex from one T1w scan.",
       "paper_label": "medRxiv 2026",
-      "paper_url": "https://doi.org/10.1101/2026.03.30.24305086",
-      "citation": "Svanera et al., NeuroFM: Toward Precision Neuroimaging with Foundation Models for Individualized Brain Health Estimation, medRxiv (2026)",
+      "paper_url": "https://doi.org/10.64898/2026.03.27.26349489",
+      "citation": "Dibble, Svanera et al., NeuroFM: Toward Precision Neuroimaging with Foundation Models for Individualized Brain Health Estimation, medRxiv (2026)",
       "weights": [
         {
           "via": "hf",
@@ -724,9 +724,9 @@
       "tasks": ["segment_brain", "embed_volumes"],
       "source": "HF+GH+Paper",
       "notes": "Two-stage 3D self-supervised SwinUNETR pretrained on >41,000 UK Biobank brain MRIs with fine-tuned checkpoints for BraTS glioma sub-regions (WT, TC, ET) and ATLAS stroke lesions.",
-      "paper_label": "Med. Image Anal. / arXiv:2406.10395",
-      "paper_url": "https://arxiv.org/abs/2406.10395",
-      "citation": "Cox et al., BrainSegFounder: Towards 3D Foundation Models for Neuroimage Segmentation, Medical Image Analysis / arXiv:2406.10395 (2024)",
+      "paper_label": "Med. Image Anal. 2024",
+      "paper_url": "https://doi.org/10.1016/j.media.2024.103301",
+      "citation": "Cox et al., BrainSegFounder: Towards 3D Foundation Models for Neuroimage Segmentation, Medical Image Analysis (2024)",
       "weights": [
         {
           "via": "hf",
@@ -1062,21 +1062,21 @@
       "embed_dim": 512,
       "voxel_spec": "Any parcellation atlas (Schaefer / AAL / MMP)",
       "hf_repo": null,
-      "link": "https://arxiv.org/abs/2506.02044",
+      "link": "https://github.com/weixinxu666/BrainGFM",
       "licence": "Academic Research",
       "commercial_use": false,
       "gated": false,
       "tasks": ["decode_fmri"],
-      "source": "Paper",
+      "source": "GH+Paper",
       "notes": "Pretrained across diverse anatomical and functional brain atlases with meta-learned graph prompts and text disorder descriptions for cross-atlas connectome diagnosis.",
       "paper_label": "arXiv:2506.02044",
       "paper_url": "https://arxiv.org/abs/2506.02044",
-      "citation": "BrainGFM Team, A Brain Graph Foundation Model: Pre-Training and Prompt-Tuning across Broad Atlases and Disorders, arXiv:2506.02044 (2025)",
+      "citation": "Xu et al., A Brain Graph Foundation Model: Pre-Training and Prompt-Tuning across Broad Atlases and Disorders, arXiv:2506.02044 (2025)",
       "weights": [
         {
           "via": "external",
-          "url": "https://arxiv.org/abs/2506.02044",
-          "note": "Download BrainGFM checkpoint from the authors' code release linked in arXiv:2506.02044.",
+          "url": "https://github.com/weixinxu666/BrainGFM",
+          "note": "Clone weixinxu666/BrainGFM and set braingfm_ckpt in backend/config.yaml.",
           "gb": null
         }
       ],

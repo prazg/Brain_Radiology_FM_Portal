@@ -1,14 +1,36 @@
 /* Brain Radiology FM Portal — single-page workstation controller (vanilla JS, zero build step). */
 (function () {
   "use strict";
-  const { h } = window.Viewers;
+  const { h, hideTip } = window.Viewers;
   const $ = s => document.querySelector(s);
   const $$ = s => [...document.querySelectorAll(s)];
+
+  function loadSavedPinned() {
+    try {
+      const raw = JSON.parse(sessionStorage.getItem("neuro_fm_pinned") || "[]");
+      return Array.isArray(raw) ? raw.filter(x => typeof x === "string").slice(0, 4) : [];
+    } catch {
+      return [];
+    }
+  }
 
   const S = {
     reg: null,
     view: "models",
-    filter: { q: "", cat: "all", modality: "all", commercial: false, ungated: false, ready: false, hwFit: false },
+    filter: {
+      q: "",
+      scenario: "all",
+      cat: "all",
+      modality: "all",
+      commercial: false,
+      ungated: false,
+      ready: false,
+      hwFit: false
+    },
+    hwProfile: localStorage.getItem("neuro_fm_hw_profile") || "auto",
+    pinned: loadSavedPinned(),
+    dockMsg: "",
+    dockMsgTimer: null,
     paperQ: "",
     mode: localStorage.getItem("neuro_fm_mode") || "demo",
     url: (localStorage.getItem("neuro_fm_url") || "http://127.0.0.1:8000").replace(/\/+$/, ""),
@@ -27,6 +49,51 @@
     pollTimer: null,
     weightsTimer: null
   };
+
+  const CLINICAL_SCENARIOS = [
+    {
+      id: "all",
+      label: reg => `All ${reg ? reg.models.length : 28} Models`,
+      preferTask: null,
+      match: () => true
+    },
+    {
+      id: "glioma_seg",
+      label: () => "Glioma & Lesion 3D Seg",
+      preferTask: "segment_brain",
+      match: m => m.tasks.includes("segment_brain")
+    },
+    {
+      id: "ct_triage",
+      label: () => "Head CT Triage",
+      preferTask: "zeroshot_neuro",
+      match: m => m.modality === "ct" || m.modality === "mri_ct"
+    },
+    {
+      id: "vlm_report",
+      label: () => "3D Vision-Language Report",
+      preferTask: "report_vqa",
+      match: m => m.tasks.includes("report_vqa")
+    },
+    {
+      id: "brain_age",
+      label: () => "BrainAge & Volumetric Emb",
+      preferTask: "brain_health",
+      match: m => m.tasks.includes("brain_health") || (m.tasks.includes("embed_volumes") && m.modality !== "fmri" && m.id !== "biomedclip")
+    },
+    {
+      id: "cross_synth",
+      label: () => "Cross-Sequence Synthesis",
+      preferTask: "synth_register",
+      match: m => m.tasks.includes("synth_register") || m.id === "brainmvp"
+    },
+    {
+      id: "fmri_conn",
+      label: () => "4D fMRI Connectomics",
+      preferTask: "decode_fmri",
+      match: m => m.modality === "fmri" || m.tasks.includes("decode_fmri")
+    }
+  ];
 
   const NEURO_PROMPTS = {
     ct_triage: {
@@ -70,19 +137,147 @@
     }
   };
 
+  function texEscape(s) {
+    return String(s || "").replace(/&/g, "\\&");
+  }
+
+  function parseCitationMeta(m) {
+    const cit = (m.citation || "").trim();
+    let authorBib = (m.developer || "Authors").trim();
+    let title = m.name;
+
+    if (cit) {
+      let rawAuthors = "";
+      let rest = "";
+      const etAlMatch = cit.match(/^(.+\bet al\.),\s*(.+)$/);
+      const ampMatch = !etAlMatch ? cit.match(/^([^,]+(?:,\s*[^,]+)*?\s*&\s*[^,]+),\s*(.+)$/) : null;
+      if (etAlMatch) {
+        rawAuthors = etAlMatch[1].trim();
+        rest = etAlMatch[2].trim();
+      } else if (ampMatch) {
+        rawAuthors = ampMatch[1].trim();
+        rest = ampMatch[2].trim();
+      } else {
+        const idx = cit.indexOf(",");
+        if (idx > 0) {
+          rawAuthors = cit.slice(0, idx).trim();
+          rest = cit.slice(idx + 1).trim();
+        } else {
+          rest = cit;
+        }
+      }
+
+      if (rawAuthors) {
+        const hasEtAl = /\bet al\./i.test(rawAuthors);
+        const names = rawAuthors
+          .replace(/\bet al\.?/gi, "")
+          .split(/[,/&]+/)
+          .map(s => s.trim())
+          .filter(Boolean);
+        if (names.length) {
+          authorBib = names.join(" and ") + (hasEtAl ? " and others" : "");
+        }
+      }
+
+      if (rest) {
+        title = rest
+          .replace(/,\s*Google Health AI,\s*[^,]+\(\d{4}(?:\s*\/\s*\d{4})?\)\s*$/i, "")
+          .replace(/,\s*[^,]+\(\d{4}(?:\s*\/\s*\d{4})?\)\s*$/, "")
+          .trim() || m.name;
+      }
+    }
+
+    const yr = (m.paper_label?.match(/20\d\d/) || m.citation?.match(/20\d\d/) || ["2025"])[0];
+    const url = m.paper_url || m.link || "";
+    const doiMatch = url.match(/^https?:\/\/doi\.org\/(.+)$/i);
+    const arxivMatch = url.match(/^https?:\/\/arxiv\.org\/abs\/([0-9]+\.[0-9]+(?:v\d+)?)/i);
+    const journalClean = (m.paper_label || "Preprint").replace(/\s+20\d\d\b/, "").trim() || m.paper_label || "Preprint";
+
+    return {
+      key: `${m.id}_${yr}`,
+      author: texEscape(authorBib),
+      title: texEscape(title),
+      journal: texEscape(journalClean),
+      year: yr,
+      doi: doiMatch ? doiMatch[1] : null,
+      arxiv: arxivMatch ? arxivMatch[1] : null,
+      url
+    };
+  }
+
   function bibtexFor(m) {
-    const yr = (m.paper_label?.match(/20\d\d/) || ["2025"])[0];
-    const firstAuthor = (m.citation || m.developer || "Author").split(",")[0].trim();
-    const titlePart = m.citation ? (m.citation.split(",")[1] || m.name).trim() : m.name;
-    return [
-      `@article{${m.id}_${yr},`,
-      `  title   = {${titlePart}},`,
-      `  author  = {${firstAuthor} and others},`,
-      `  journal = {${m.paper_label || "Preprint"}},`,
-      `  year    = {${yr}},`,
-      `  url     = {${m.paper_url || m.link}}`,
-      `}`
-    ].join("\n");
+    const meta = parseCitationMeta(m);
+    const lines = [
+      `@article{${meta.key},`,
+      `  title   = {${meta.title}},`,
+      `  author  = {${meta.author}},`,
+      `  journal = {${meta.journal}},`,
+      `  year    = {${meta.year}},`
+    ];
+    if (meta.doi) lines.push(`  doi     = {${meta.doi}},`);
+    if (meta.arxiv) {
+      lines.push(`  eprint  = {${meta.arxiv}},`);
+      lines.push(`  archivePrefix = {arXiv},`);
+    }
+    lines.push(`  url     = {${meta.url}}`);
+    lines.push(`}`);
+    return lines.join("\n");
+  }
+
+  function downloadBlobFile(filename, content, mime) {
+    const blob = new Blob([content], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const a = h("a", { href: url, download: filename, hidden: true });
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1800);
+  }
+
+  function exportModelsBibtex(models, filename = "neurorad_fm_models.bib") {
+    if (!models || !models.length) return;
+    const header = `% Brain Radiology FM Portal (NeuroRad-FM) — ${models.length} neuroimaging foundation model citation(s)\n% Generated ${new Date().toISOString().slice(0, 10)}\n\n`;
+    const body = models.map(bibtexFor).join("\n\n") + "\n";
+    downloadBlobFile(filename, header + body, "application/x-bibtex;charset=utf-8");
+  }
+
+  function exportModelsCsv(models, filename = "neurorad_fm_models.csv") {
+    if (!models || !models.length || !S.reg) return;
+    const cols = [
+      "id", "name", "developer", "category", "modality", "voxel_spec", "arch", "embed_dim",
+      "weights_gb", "runtime_weights_gb", "min_vram_gb", "hardware_tier", "tasks",
+      "licence", "commercial_use", "gated", "hf_repo", "weights_or_code_url",
+      "paper_label", "paper_url", "citation"
+    ];
+    const rows = models.map(m => {
+      const fit = fitOf(m);
+      return [
+        m.id,
+        m.name,
+        m.developer,
+        S.reg.categories[m.category]?.label || m.category,
+        modBadgeLabel(m.modality),
+        m.voxel_spec || "",
+        m.arch || "",
+        m.embed_dim ?? "",
+        m.weights_gb ?? "",
+        m.runtime_weights_gb ?? "",
+        fit.needVram,
+        fit.tier?.label || "",
+        m.tasks.map(t => S.reg.tasks[t]?.label || t).join("; "),
+        m.licence || "",
+        m.commercial_use ? "yes" : "no",
+        m.gated ? "gated" : "ungated",
+        m.hf_repo || "",
+        m.link || "",
+        m.paper_label || "",
+        m.paper_url || "",
+        m.citation || ""
+      ];
+    });
+    const csvCell = v => `"${String(v ?? "").replace(/"/g, '""')}"`;
+    const txt = "\uFEFF" + [cols.map(csvCell).join(","), ...rows.map(r => r.map(csvCell).join(","))].join("\r\n") + "\r\n";
+    downloadBlobFile(filename, txt, "text/csv;charset=utf-8");
   }
 
   function quickstartSnippet(m) {
@@ -115,14 +310,24 @@
   }
 
   /* ── theme ──────────────────────────────────────────────────────────────── */
+  function syncThemeBtn() {
+    const isDark = document.documentElement.dataset.theme === "dark";
+    const btn = $("#themeBtn");
+    if (!btn) return;
+    btn.setAttribute("aria-pressed", String(isDark));
+    btn.title = isDark ? "PACS Darkroom active — switch to Lightbox theme" : "Lightbox active — switch to PACS Darkroom theme";
+  }
+
   function initTheme() {
     const saved = localStorage.getItem("neuro_fm_theme");
     const dark = saved ? saved === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
     document.documentElement.dataset.theme = dark ? "dark" : "light";
+    syncThemeBtn();
     $("#themeBtn").onclick = () => {
       const next = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
       document.documentElement.dataset.theme = next;
       localStorage.setItem("neuro_fm_theme", next);
+      syncThemeBtn();
       if (S.activeJob) renderJobDetail(S.activeJob);
     };
   }
@@ -131,6 +336,7 @@
   function go(view) {
     if (!["models", "run", "results", "papers", "connect"].includes(view)) view = "models";
     S.view = view;
+    hideTip();
     $$("main > section").forEach(s => { s.hidden = s.id !== "view-" + view; });
     $$(".tabs button").forEach(b => {
       if (b.dataset.view === view) b.setAttribute("aria-current", "page");
@@ -198,7 +404,7 @@
     return Boolean(S.ready[m.id]?.ready);
   }
   function fitOf(m) {
-    return window.Hardware.fit(m, S.reg.hardware_rules, S.health?.hardware || null, S.browserHw, S.perf);
+    return window.Hardware.fit(m, S.reg.hardware_rules, S.health?.hardware || null, S.browserHw, S.perf, S.hwProfile);
   }
   function weightInfo(m) {
     return S.weights[m.id] || null;
@@ -216,14 +422,14 @@
 
     const parts = [];
     if (srv) {
-      const gpu = srv.gpus?.[0];
+      const gpu = srv.gpus?.[0] || srv.driver_gpus?.[0];
       parts.push(h("span", null, h("strong", null, "Server: "),
-        gpu ? `${gpu.name} (${gpu.vram_total_gb} GB VRAM)` : "CPU only (no CUDA GPU)"),
+        gpu ? `${gpu.name} (${gpu.vram_total_gb} GB VRAM)` : (srv.mps_available ? "Apple Silicon MPS" : "CPU only (no CUDA GPU)")),
         h("span", { class: "sep" }, "·"),
         h("span", null, `${srv.cpu_cores || "?"} cores${srv.ram_total_gb ? `, ${srv.ram_total_gb} GB RAM` : ""}`),
         srv.weights_disk_free_gb != null ? [h("span", { class: "sep" }, "·"), h("span", null, `${srv.weights_disk_free_gb} GB free in HF cache`)] : null,
         h("span", { class: "sep" }, "·"),
-        h("span", null, h("strong", null, `${fits} of ${total}`), " models fit this server"));
+        h("span", null, h("strong", null, `${fits} of ${total}`), " models fit target"));
     } else if (br) {
       const gtxt = br.gpuName
         ? `${br.gpuName}${br.vramGuessGb ? ` (~${br.vramGuessGb} GB est.)` : ""}`
@@ -231,19 +437,260 @@
       parts.push(h("span", null, h("strong", null, "This device: "), gtxt),
         br.cores ? [h("span", { class: "sep" }, "·"), h("span", null, `${br.cores} threads`)] : null,
         h("span", { class: "sep" }, "·"),
+        h("span", null, h("strong", null, `${fits} of ${total}`), " models fit"),
+        h("span", { class: "sep" }, "·"),
         h("span", { class: "muted" }, S.mode === "demo"
-          ? "Running in browser Demo mode — connect your GPU server under Connect for real NIfTI inference."
+          ? "Browser Demo mode active — connect a GPU server under Connect for real NIfTI inference."
           : "Connect to your server for exact CUDA VRAM and cached weight checks."));
     }
+
+    const profSel = h("select", {
+      class: "hw-profile-sel",
+      id: "hwProfileSel",
+      "aria-label": "Target GPU VRAM profile for hardware fit",
+      onchange: e => {
+        S.hwProfile = e.target.value;
+        localStorage.setItem("neuro_fm_hw_profile", S.hwProfile);
+        renderHardwareBar();
+        renderCatalogue();
+        if ($("#compareModal")?.open) renderCompareModal();
+      }
+    }, (window.Hardware.HW_PROFILES || []).map(p =>
+      h("option", { value: p.id, selected: p.id === S.hwProfile }, p.label)));
+
+    parts.push(h("label", { class: "hw-profile-wrap", for: "hwProfileSel" }, "VRAM target:", profSel));
 
     const warns = (srv?.warnings || []).map(w => h("div", { class: "hw-warn" }, w));
     bar.replaceChildren(...parts.flat().filter(Boolean), ...warns);
     bar.title = rules.source;
   }
 
-  /* ── catalogue ──────────────────────────────────────────────────────────── */
+  /* ── Pin-to-Compare (up to 4 models) ────────────────────────────────────── */
+  function savePinned() {
+    try { sessionStorage.setItem("neuro_fm_pinned", JSON.stringify(S.pinned)); } catch {}
+  }
+
+  function isPinned(modelId) {
+    return S.pinned.includes(modelId);
+  }
+
+  function togglePin(modelId) {
+    const idx = S.pinned.indexOf(modelId);
+    clearTimeout(S.dockMsgTimer);
+    if (idx >= 0) {
+      S.pinned.splice(idx, 1);
+      S.dockMsg = "";
+    } else if (S.pinned.length >= 4) {
+      S.dockMsg = "Up to 4 models can be compared side-by-side — unpin a model below to add another.";
+      S.dockMsgTimer = setTimeout(() => { S.dockMsg = ""; renderCompareDock(); }, 4200);
+      renderCompareDock();
+      return false;
+    } else {
+      S.pinned.push(modelId);
+      S.dockMsg = "";
+    }
+    savePinned();
+    renderCatalogue();
+    renderCompareDock();
+    if ($("#compareModal")?.open) {
+      if (S.pinned.length) renderCompareModal();
+      else $("#compareModal").close();
+    }
+    return true;
+  }
+
+  function clearPinned() {
+    S.pinned = [];
+    S.dockMsg = "";
+    savePinned();
+    renderCatalogue();
+    renderCompareDock();
+    if ($("#compareModal")?.open) $("#compareModal").close();
+  }
+
+  function pinnedModels() {
+    if (!S.reg) return [];
+    return S.pinned.map(id => S.reg.models.find(m => m.id === id)).filter(Boolean);
+  }
+
+  function renderCompareDock() {
+    const dock = $("#compareDock");
+    if (!dock || !S.reg) return;
+    const list = pinnedModels();
+    document.body.classList.toggle("has-cmp-dock", list.length > 0);
+    if (!list.length) {
+      dock.hidden = true;
+      dock.replaceChildren();
+      return;
+    }
+    dock.hidden = false;
+    const pills = list.map(m =>
+      h("span", { class: "cmp-pill" },
+        h("span", { class: "swatch", style: { background: `var(--fam-${m.category})` } }),
+        m.name,
+        h("button", {
+          type: "button",
+          "aria-label": `Unpin ${m.name}`,
+          title: `Unpin ${m.name}`,
+          onclick: () => togglePin(m.id)
+        }, "✕")));
+
+    dock.replaceChildren(
+      h("div", { class: "cmp-dock-list" },
+        h("span", { class: "cmp-dock-title" }, `Compare 3D Models (${list.length}/4)`),
+        ...pills),
+      h("div", { class: "cmp-dock-actions" },
+        h("button", { class: "btn small", type: "button", onclick: openCompareModal }, `Compare side-by-side (${list.length})`),
+        h("button", { class: "btn ghost small", type: "button", onclick: () => exportModelsBibtex(list, "neurorad_fm_compared.bib") }, "↓ .bib"),
+        h("button", { class: "btn ghost small", type: "button", onclick: () => exportModelsCsv(list, "neurorad_fm_compared.csv") }, "↓ .csv"),
+        h("button", { class: "btn ghost small", type: "button", onclick: clearPinned }, "Clear")),
+      S.dockMsg ? h("div", { class: "cmp-dock-msg", role: "status" }, S.dockMsg) : null
+    );
+  }
+
+  function openCompareModal() {
+    const dlg = $("#compareModal");
+    if (!dlg || !S.pinned.length) return;
+    renderCompareModal();
+    if (!dlg.open) dlg.showModal();
+  }
+
+  function renderCompareModal() {
+    const dlg = $("#compareModal");
+    if (!dlg || !S.reg) return;
+    const list = pinnedModels();
+    if (!list.length) { dlg.close(); return; }
+
+    const remaining = S.reg.models.filter(m => !isPinned(m.id));
+    const addSelect = list.length < 4 && remaining.length ? h("select", {
+      class: "cmp-add-sel",
+      "aria-label": "Add another model to comparison",
+      onchange: e => {
+        if (e.target.value) togglePin(e.target.value);
+      }
+    },
+      h("option", { value: "" }, "+ Add model to compare…"),
+      ...remaining.map(m => h("option", { value: m.id }, `${m.name} (${modBadgeLabel(m.modality)})`))) : null;
+
+    const headCells = [
+      h("th", { scope: "col" }, "Specification"),
+      ...list.map(m => h("th", { scope: "col" },
+        h("div", { style: { display: "flex", justifyContent: "space-between", gap: "8px", alignItems: "flex-start" } },
+          h("div", null,
+            h("div", { style: { fontFamily: "var(--display)", fontWeight: "700", fontSize: "0.96rem" } }, m.name),
+            h("div", { class: "small muted", style: { fontWeight: "400" } }, m.developer)),
+          h("button", {
+            class: "icon-btn",
+            style: { width: "26px", height: "26px", fontSize: "0.75rem" },
+            type: "button",
+            "aria-label": `Remove ${m.name} from comparison`,
+            title: "Unpin model",
+            onclick: () => togglePin(m.id)
+          }, "✕")),
+        h("div", { style: { display: "flex", gap: "6px", flexWrap: "wrap", marginTop: "8px" } },
+          h("span", { class: "badge", style: { borderLeft: `3px solid var(--fam-${m.category})` } }, S.reg.categories[m.category]?.label || m.category),
+          h("button", {
+            class: "btn small",
+            style: { padding: "3px 9px", fontSize: "0.76rem" },
+            type: "button",
+            onclick: () => { dlg.close(); openInRun(m.id); }
+          }, "Run →"))))
+    ];
+
+    const specRows = [
+      ["Modality & Scan", m => h("div", null,
+        h("span", { class: `badge mod-${m.modality}` }, modBadgeLabel(m.modality)),
+        m.seq_hint ? h("div", { class: "small muted", style: { marginTop: "4px" } }, m.seq_hint) : null)],
+      ["3D Input Grid", m => h("code", null, m.voxel_spec || "3D NIfTI")],
+      ["VRAM & Fit", m => {
+        const fit = fitOf(m);
+        const cls = fit.level === "ok" ? "badge ok" : fit.level === "warn" ? "badge warn" : fit.level === "bad" ? "badge bad" : "badge";
+        const wGb = m.runtime_weights_gb || m.weights_gb || 0;
+        return h("div", null,
+          h("div", { class: "mono", style: { fontWeight: "700", fontSize: "0.82rem" } }, `~${fit.needVram} GB VRAM (${fit.tier.label})`),
+          h("div", { class: "small muted" }, `Weights: ~${wGb} GB${m.runtime_weights_gb > m.weights_gb ? " (incl. encoder)" : ""}`),
+          h("div", { style: { marginTop: "4px" } }, h("span", { class: cls }, fit.short)));
+      }],
+      ["Architecture", m => h("div", null,
+        h("div", { style: { fontWeight: "600" } }, m.arch),
+        h("div", { class: "small muted mono" }, m.embed_dim ? `${m.embed_dim}-d latent embedding` : "Dense 3D voxel / task head"))],
+      ["Portal Tasks", m => h("div", { class: "badges" },
+        m.tasks.map(t => h("span", { class: "badge accent" }, S.reg.tasks[t]?.label || t)))],
+      ["Licence", m => h("div", null,
+        h("span", { class: m.commercial_use ? "badge ok" : "badge" }, m.commercial_use ? "Commercial OK" : "Research / Non-Comm"),
+        h("div", { class: "small muted", style: { marginTop: "4px" } }, m.licence))],
+      ["Gating & Repo", m => h("div", null,
+        h("span", { class: m.gated ? "badge warn" : "badge ok" }, m.gated ? "Gated HF (token req.)" : (m.hf_repo ? "Ungated Public HF" : "Ungated GitHub / CLI")),
+        h("div", { class: "small", style: { marginTop: "4px" } },
+          h("a", { href: m.link, target: "_blank", rel: "noopener noreferrer" }, m.hf_repo || "Repository ↗")))],
+      ["Paper & DOI", m => {
+        const copyBtn = h("button", {
+          class: "btn ghost small",
+          style: { marginTop: "6px", padding: "2px 8px", fontSize: "0.74rem" },
+          type: "button",
+          onclick: () => {
+            navigator.clipboard?.writeText(bibtexFor(m));
+            copyBtn.textContent = "BibTeX copied!";
+            setTimeout(() => { copyBtn.textContent = "Copy BibTeX"; }, 1300);
+          }
+        }, "Copy BibTeX");
+        return h("div", null,
+          m.paper_url
+            ? h("a", { href: m.paper_url, target: "_blank", rel: "noopener noreferrer", style: { fontWeight: "700" } }, `${m.paper_label || "Paper"} ↗`)
+            : (m.paper_label || "—"),
+          m.paper_url ? h("div", { class: "small muted mono", style: { fontSize: "0.72rem", marginTop: "2px", wordBreak: "break-all" } },
+            m.paper_url.replace(/^https?:\/\/(doi\.org\/)?/i, "")) : null,
+          copyBtn);
+      }],
+      ["Clinical Summary", m => h("p", { class: "small", style: { color: "var(--ink-2)" } }, m.notes)]
+    ];
+
+    dlg.replaceChildren(
+      h("div", { class: "cmp-modal-in" },
+        h("div", { class: "cmp-modal-head" },
+          h("div", null,
+            h("h2", { id: "cmpTitle" }, `Side-by-Side 3D Model Comparison (${list.length} / 4)`),
+            h("p", { class: "small muted" }, "Comparing modality, 3D input voxel grid, VRAM requirement, architecture, portal tasks, licence, HF gating, and verified DOI.")),
+          h("div", { class: "cmp-modal-tools" },
+            addSelect,
+            h("button", { class: "btn ghost small", type: "button", onclick: () => exportModelsBibtex(list, "neurorad_fm_compared.bib") }, `↓ Export BibTeX (${list.length} .bib)`),
+            h("button", { class: "btn ghost small", type: "button", onclick: () => exportModelsCsv(list, "neurorad_fm_compared.csv") }, `↓ Export CSV (${list.length})`),
+            h("button", { class: "icon-btn", type: "button", "aria-label": "Close comparison modal", onclick: () => dlg.close() }, "✕"))),
+        h("div", { class: "cmp-table-wrap" },
+          h("table", { class: "cmp-table" },
+            h("thead", null, h("tr", null, headCells)),
+            h("tbody", null, specRows.map(([label, cellFn]) =>
+              h("tr", null, h("th", { scope: "row" }, label), ...list.map(m => h("td", null, cellFn(m))))))))
+      )
+    );
+  }
+
+  /* ── catalogue & clinical scenario quick-filter chips ───────────────────── */
+  function activeScenarioObj() {
+    return CLINICAL_SCENARIOS.find(s => s.id === S.filter.scenario) || CLINICAL_SCENARIOS[0];
+  }
+
+  function hasActiveFilters() {
+    const f = S.filter;
+    return Boolean(f.q || f.scenario !== "all" || f.cat !== "all" || f.modality !== "all" || f.commercial || f.ungated || f.ready || f.hwFit);
+  }
+
+  function resetAllFilters() {
+    S.filter = { q: "", scenario: "all", cat: "all", modality: "all", commercial: false, ungated: false, ready: false, hwFit: false };
+    $("#q").value = "";
+    $("#fCommercial").checked = false;
+    $("#fUngated").checked = false;
+    $("#fReady").checked = false;
+    $("#fHw").checked = false;
+    syncSearchKbdHints();
+    renderFilters();
+    renderCatalogue();
+  }
+
   function matches(m) {
     const f = S.filter;
+    const sc = activeScenarioObj();
+    if (!sc.match(m)) return false;
     if (f.cat !== "all" && m.category !== f.cat) return false;
     if (f.modality !== "all" && m.modality !== f.modality) return false;
     if (f.commercial && !m.commercial_use) return false;
@@ -251,18 +698,43 @@
     if (f.ready && !isReady(m)) return false;
     if (f.hwFit && fitOf(m).level !== "ok") return false;
     if (f.q) {
-      const hay = `${m.name} ${m.developer} ${m.arch} ${m.notes} ${m.licence} ${m.seq_hint || ""} ${m.paper_label || ""} ${m.citation || ""} ${m.hf_repo || ""}`.toLowerCase();
+      const hay = `${m.name} ${m.developer} ${m.arch} ${m.notes} ${m.licence} ${m.seq_hint || ""} ${m.paper_label || ""} ${m.paper_url || ""} ${m.citation || ""} ${m.hf_repo || ""}`.toLowerCase();
       if (!hay.includes(f.q.toLowerCase())) return false;
     }
     return true;
   }
 
+  function renderScenarioChips() {
+    const bar = $("#scenarioChips");
+    if (!bar || !S.reg) return;
+    bar.replaceChildren(...CLINICAL_SCENARIOS.map(sc => {
+      const cnt = S.reg.models.filter(sc.match).length;
+      return h("button", {
+        type: "button",
+        class: "scenario-chip",
+        "aria-pressed": String(S.filter.scenario === sc.id),
+        onclick: () => {
+          S.filter.scenario = sc.id;
+          S.filter.cat = "all";
+          S.filter.modality = "all";
+          renderFilters();
+          renderCatalogue();
+        }
+      }, sc.label(S.reg), h("span", { class: "chip-n" }, cnt));
+    }));
+  }
+
   function renderFilters() {
+    if (!S.reg) return;
     const cats = S.reg.categories;
     const ul = $("#famList");
     ul.replaceChildren();
     const addFam = (key, label, color, n) => {
-      const b = h("button", { "aria-pressed": String(S.filter.cat === key), onclick: () => { S.filter.cat = key; renderFilters(); renderCatalogue(); } },
+      const b = h("button", {
+        type: "button",
+        "aria-pressed": String(S.filter.cat === key),
+        onclick: () => { S.filter.cat = key; renderFilters(); renderCatalogue(); }
+      },
         color ? h("span", { class: "swatch", style: { background: color } }) : null,
         label, h("span", { class: "n" }, n));
       ul.append(h("li", null, b));
@@ -276,8 +748,11 @@
     if (ml && S.reg.modalities) {
       ml.replaceChildren();
       const addMod = (key, label, n) => {
-        const b = h("button", { "aria-pressed": String(S.filter.modality === key), onclick: () => { S.filter.modality = key; renderFilters(); renderCatalogue(); } },
-          label, h("span", { class: "n" }, n));
+        const b = h("button", {
+          type: "button",
+          "aria-pressed": String(S.filter.modality === key),
+          onclick: () => { S.filter.modality = key; renderFilters(); renderCatalogue(); }
+        }, label, h("span", { class: "n" }, n));
         ml.append(h("li", null, b));
       };
       addMod("all", "All modalities", S.reg.models.length);
@@ -297,6 +772,7 @@
 
   function slideCard(m) {
     const rdy = S.ready[m.id];
+    const pinned = isPinned(m.id);
     const spec = [
       m.arch,
       m.embed_dim ? `${m.embed_dim}-d` : null,
@@ -312,11 +788,21 @@
       : (m.weights_gb ? h("span", { class: "badge", title: "Approximate checkpoint size" }, `~${m.weights_gb} GB`) : null);
     const fitCls = fit.level === "ok" ? "badge ok" : fit.level === "warn" ? "badge warn" : fit.level === "bad" ? "badge bad" : "badge";
 
-    return h("article", { class: `slide fam-${m.category}` },
+    return h("article", { class: `slide fam-${m.category}${pinned ? " is-pinned" : ""}` },
       h("div", { class: "slide-frosted", "aria-hidden": "true" }),
       h("div", { class: "slide-body" },
         h("div", { class: "slide-top" },
-          h("div", null, h("div", { class: "slide-name" }, m.name), h("div", { class: "slide-org" }, m.developer))),
+          h("div", { style: { minWidth: 0 } },
+            h("div", { class: "slide-name" }, m.name),
+            h("div", { class: "slide-org" }, m.developer)),
+          h("button", {
+            class: "pin-btn",
+            type: "button",
+            "aria-pressed": String(pinned),
+            "aria-label": pinned ? `Unpin ${m.name} from comparison` : `Pin ${m.name} to compare (up to 4)`,
+            title: pinned ? "Pinned to 3D Comparator (click to unpin)" : "Pin to side-by-side 3D Comparator (up to 4 models)",
+            onclick: () => togglePin(m.id)
+          }, pinned ? "✓ Pinned" : "+ Compare")),
         h("div", { class: "slide-spec" }, spec.map((s, i) => h("span", null, i ? "· " + s : s))),
         h("p", { class: "slide-notes" }, m.notes),
         h("div", { class: "badges" },
@@ -328,15 +814,50 @@
           S.mode !== "demo" && rdy ? h("span", { class: rdy.ready ? "badge accent" : "badge", title: rdy.reason || "" }, rdy.ready ? "Server ready" : "Setup needed") : null),
         h("div", { class: "slide-actions" },
           h("button", { class: "link-btn", type: "button", onclick: () => openInRun(m.id) }, "Run →"),
-          m.paper_url ? h("a", { class: "paper-chip", href: m.paper_url, target: "_blank", rel: "noopener", title: m.citation || m.paper_label }, `📄 ${m.paper_label || "Paper"}`) : null,
+          m.paper_url ? h("a", { class: "paper-chip", href: m.paper_url, target: "_blank", rel: "noopener noreferrer", title: m.citation || m.paper_label }, `📄 ${m.paper_label || "Paper"}`) : null,
           h("button", { class: "link-btn muted", type: "button", onclick: () => openDrawer(m) }, "Details & CLI"))));
+  }
+
+  function renderRackToolbar(shown) {
+    const bar = $("#rackToolbar");
+    if (!bar || !S.reg) return;
+    const total = S.reg.models.length;
+    const filtered = hasActiveFilters();
+
+    bar.replaceChildren(
+      h("div", { class: "rack-status" },
+        h("span", null,
+          "Showing ", h("strong", null, shown.length), ` of ${total} neuroimaging models`),
+        filtered ? h("button", {
+          class: "link-btn",
+          type: "button",
+          onclick: resetAllFilters
+        }, "Reset filters") : null),
+      h("div", { class: "rack-exports" },
+        h("button", {
+          class: "btn ghost small",
+          type: "button",
+          disabled: !shown.length,
+          title: "Download BibTeX citations (.bib) for all currently filtered models",
+          onclick: () => exportModelsBibtex(shown, filtered ? "neurorad_fm_filtered.bib" : "neurorad_fm_all28.bib")
+        }, `↓ Export BibTeX (${shown.length} .bib)`),
+        h("button", {
+          class: "btn ghost small",
+          type: "button",
+          disabled: !shown.length,
+          title: "Download structured model metadata & hardware specs (.csv) for filtered models",
+          onclick: () => exportModelsCsv(shown, filtered ? "neurorad_fm_filtered.csv" : "neurorad_fm_all28.csv")
+        }, `↓ Export CSV (${shown.length})`))
+    );
   }
 
   function renderCatalogue() {
     if (!S.reg) return;
+    renderScenarioChips();
     const rack = $("#rack");
     rack.replaceChildren();
     const shown = S.reg.models.filter(matches);
+    renderRackToolbar(shown);
 
     const openCnt = S.reg.models.filter(m => !m.gated).length;
     const commCnt = S.reg.models.filter(m => m.commercial_use).length;
@@ -348,7 +869,9 @@
       h("div", null, h("strong", null, commCnt), "permissive licence"));
 
     if (!shown.length) {
-      rack.append(h("div", { class: "empty" }, "No neuroimaging models match those filters."));
+      rack.append(h("div", { class: "empty" },
+        "No neuroimaging models match those filters. ",
+        h("button", { class: "link-btn", type: "button", onclick: resetAllFilters }, "Reset all filters")));
       return;
     }
     for (const [k, c] of Object.entries(S.reg.categories)) {
@@ -388,8 +911,8 @@
       ["Tasks in portal", tasks],
       ["Licence", `${m.licence}${m.commercial_use ? " (commercial use allowed)" : " (research / non-commercial — check card)"}`],
       ["HF access", m.gated ? "Gated — accept terms on Hugging Face & pass token" : (m.hf_repo ? "Public Hugging Face download" : "Public GitHub / package checkpoint")],
-      ["Paper", m.paper_url ? h("a", { href: m.paper_url, target: "_blank", rel: "noopener" }, `${m.paper_label || "Read paper"} ↗`) : "—"],
-      ["Weights / code", h("a", { href: m.link, target: "_blank", rel: "noopener" }, m.hf_repo || m.link)],
+      ["Paper", m.paper_url ? h("a", { href: m.paper_url, target: "_blank", rel: "noopener noreferrer" }, `${m.paper_label || "Read paper"} ↗`) : "—"],
+      ["Weights / code", h("a", { href: m.link, target: "_blank", rel: "noopener noreferrer" }, m.hf_repo || m.link)],
       S.mode !== "demo" && rdy ? ["Server status", rdy.ready ? "Ready" : rdy.reason] : null
     ].filter(Boolean);
 
@@ -414,10 +937,21 @@
       }
     }, "Copy BibTeX");
 
+    const pinDrawerBtn = h("button", {
+      class: "btn ghost small", type: "button",
+      "aria-pressed": String(isPinned(m.id)),
+      onclick: () => {
+        togglePin(m.id);
+        const nowPinned = isPinned(m.id);
+        pinDrawerBtn.setAttribute("aria-pressed", String(nowPinned));
+        pinDrawerBtn.textContent = nowPinned ? "✓ Pinned to Compare" : "+ Pin to Compare";
+      }
+    }, isPinned(m.id) ? "✓ Pinned to Compare" : "+ Pin to Compare");
+
     dlg.replaceChildren(h("div", { class: "drawer-in" },
       h("div", { class: "drawer-head" },
         h("div", null, h("h2", { id: "drawerTitle" }, m.name), h("p", { class: "muted small" }, m.developer)),
-        h("button", { class: "icon-btn", type: "button", "aria-label": "Close", onclick: () => dlg.close() }, "✕")),
+        h("button", { class: "icon-btn", type: "button", "aria-label": "Close details drawer", onclick: () => dlg.close() }, "✕")),
       h("p", null, m.notes),
       m.citation ? h("p", { class: "small muted" }, "Citation: ", m.citation) : null,
       h("dl", { class: "kv" }, rows.flatMap(([k, v]) => [h("dt", null, k), h("dd", null, v)])),
@@ -426,93 +960,156 @@
         h("div", { class: "cli-wrap" }, copyCliBtn, h("pre", { class: "cmd" }, cliTxt))),
       h("div", { style: { display: "flex", gap: "10px", marginTop: "auto", flexWrap: "wrap" } },
         h("button", { class: "btn", type: "button", onclick: () => { dlg.close(); openInRun(m.id); } }, "Run in portal"),
-        m.paper_url ? h("a", { class: "btn ghost", href: m.paper_url, target: "_blank", rel: "noopener" }, `Paper (${m.paper_label}) ↗`) : null,
+        pinDrawerBtn,
+        m.paper_url ? h("a", { class: "btn ghost small", href: m.paper_url, target: "_blank", rel: "noopener noreferrer" }, `Paper (${m.paper_label}) ↗`) : null,
         copyBibBtn,
-        h("a", { class: "btn ghost", href: m.link, target: "_blank", rel: "noopener" }, "Weights / Repo ↗"))));
-    dlg.showModal();
+        h("a", { class: "btn ghost small", href: m.link, target: "_blank", rel: "noopener noreferrer" }, "Weights / Repo ↗"))));
+    if (!dlg.open) dlg.showModal();
   }
 
-  /* ── Papers, Citations & Benchmarks view ────────────────────────────────── */
+  /* ── Papers, Citations & Benchmarks view (focus-preserving search) ──────── */
+  function filteredPapers() {
+    const q = (S.paperQ || "").toLowerCase();
+    return S.reg.models.filter(m => {
+      if (!q) return true;
+      return `${m.name} ${m.developer} ${m.citation || ""} ${m.paper_label || ""} ${m.paper_url || ""} ${m.modality}`.toLowerCase().includes(q);
+    });
+  }
+
+  function updatePapersTable() {
+    const tblHost = $("#papersTableHost");
+    const countEl = $("#papersCountTitle");
+    const expBibBtn = $("#papersExportBib");
+    const expCsvBtn = $("#papersExportCsv");
+    if (!tblHost || !S.reg) return;
+
+    const models = filteredPapers();
+    if (countEl) countEl.textContent = `Open-weight brain radiology foundation models (${models.length})`;
+    if (expBibBtn) {
+      expBibBtn.textContent = `↓ Export BibTeX (${models.length} .bib)`;
+      expBibBtn.disabled = !models.length;
+    }
+    if (expCsvBtn) {
+      expCsvBtn.textContent = `↓ Export CSV (${models.length})`;
+      expCsvBtn.disabled = !models.length;
+    }
+
+    if (!models.length) {
+      tblHost.replaceChildren(h("div", { class: "empty" }, "No publications match that filter."));
+      return;
+    }
+
+    tblHost.replaceChildren(
+      h("div", { class: "w-table-wrap" },
+        h("table", { class: "tbl w-table" },
+          h("thead", null, h("tr", null, ["Model", "Modality", "Family", "Publication / Preprint", "Weights / Code", "BibTeX"].map(c => h("th", null, c)))),
+          h("tbody", null, models.map(m => {
+            const bibBtn = h("button", {
+              class: "btn ghost small", type: "button",
+              onclick: () => {
+                navigator.clipboard?.writeText(bibtexFor(m));
+                bibBtn.textContent = "Copied!";
+                setTimeout(() => { bibBtn.textContent = "Copy BibTeX"; }, 1300);
+              }
+            }, "Copy BibTeX");
+            return h("tr", null,
+              h("td", null, h("strong", null, m.name), h("div", { class: "small muted" }, m.developer)),
+              h("td", null, h("span", { class: `badge mod-${m.modality}` }, modBadgeLabel(m.modality))),
+              h("td", { class: "small" }, S.reg.categories[m.category]?.label || m.category),
+              h("td", { class: "small" },
+                m.paper_url ? h("a", { href: m.paper_url, target: "_blank", rel: "noopener noreferrer" }, `${m.paper_label} ↗`) : (m.paper_label || "—"),
+                m.citation ? h("div", { class: "muted", style: { fontSize: "0.78rem" } }, m.citation) : null),
+              h("td", { class: "small" }, h("a", { href: m.link, target: "_blank", rel: "noopener noreferrer" }, m.hf_repo || "GitHub / Release")),
+              h("td", null, bibBtn)
+            );
+          }))))
+    );
+  }
+
   function renderPapers() {
     const root = $("#papersView");
     if (!root || !S.reg) return;
-    const q = (S.paperQ || "").toLowerCase();
-    const models = S.reg.models.filter(m => {
-      if (!q) return true;
-      return `${m.name} ${m.developer} ${m.citation || ""} ${m.paper_label || ""} ${m.modality}`.toLowerCase().includes(q);
-    });
 
-    const searchInput = h("input", {
-      class: "search", type: "search", value: S.paperQ,
-      placeholder: "Filter papers by model, author, journal, MRI/CT, or year…",
-      style: { maxWidth: "440px", marginBottom: "14px" },
-      oninput: e => { S.paperQ = e.target.value; renderPapers(); }
-    });
+    if (!$("#papersTableHost")) {
+      const searchInput = h("input", {
+        id: "paperSearch",
+        class: "search",
+        type: "search",
+        value: S.paperQ,
+        placeholder: "Filter papers by model, author, journal, MRI/CT, or DOI…",
+        oninput: e => {
+          S.paperQ = e.target.value;
+          syncSearchKbdHints();
+          updatePapersTable();
+        }
+      });
 
-    const tbl = h("div", { class: "w-table-wrap" },
-      h("table", { class: "tbl w-table" },
-        h("thead", null, h("tr", null, ["Model", "Modality", "Family", "Publication / Preprint", "Weights / Code", "BibTeX"].map(c => h("th", null, c)))),
-        h("tbody", null, models.map(m => {
-          const bibBtn = h("button", {
-            class: "btn ghost small", type: "button",
-            onclick: () => {
-              navigator.clipboard?.writeText(bibtexFor(m));
-              bibBtn.textContent = "Copied!";
-              setTimeout(() => { bibBtn.textContent = "Copy BibTeX"; }, 1300);
-            }
-          }, "Copy BibTeX");
-          return h("tr", null,
-            h("td", null, h("strong", null, m.name), h("div", { class: "small muted" }, m.developer)),
-            h("td", null, h("span", { class: `badge mod-${m.modality}` }, modBadgeLabel(m.modality))),
-            h("td", { class: "small" }, S.reg.categories[m.category]?.label || m.category),
-            h("td", { class: "small" },
-              m.paper_url ? h("a", { href: m.paper_url, target: "_blank", rel: "noopener" }, `${m.paper_label} ↗`) : (m.paper_label || "—"),
-              m.citation ? h("div", { class: "muted", style: { fontSize: "0.78rem" } }, m.citation) : null),
-            h("td", { class: "small" }, h("a", { href: m.link, target: "_blank", rel: "noopener" }, m.hf_repo || "GitHub / Release")),
-            h("td", null, bibBtn)
-          );
-        }))));
+      const benches = (S.reg.benchmarks || []).map(b =>
+        h("div", { class: "bench-card" },
+          h("div", { style: { display: "flex", justifyContent: "space-between", gap: "8px", alignItems: "flex-start" } },
+            h("h3", null, b.name),
+            h("span", { class: "badge accent" }, b.modality)),
+          h("p", null, b.scope),
+          h("div", { style: { display: "flex", gap: "12px", marginTop: "auto", paddingTop: "6px", fontSize: "0.83rem" } },
+            b.paper_url ? h("a", { href: b.paper_url, target: "_blank", rel: "noopener noreferrer" }, `${b.paper_label || "Paper"} ↗`) : null,
+            b.data_url ? h("a", { href: b.data_url, target: "_blank", rel: "noopener noreferrer" }, "Dataset / Challenge ↗") : null)));
 
-    const benches = (S.reg.benchmarks || []).map(b =>
-      h("div", { class: "bench-card" },
-        h("div", { style: { display: "flex", justifyContent: "space-between", gap: "8px", alignItems: "flex-start" } },
-          h("h3", null, b.name),
-          h("span", { class: "badge accent" }, b.modality)),
-        h("p", null, b.scope),
-        h("div", { style: { display: "flex", gap: "12px", marginTop: "auto", paddingTop: "6px", fontSize: "0.83rem" } },
-          b.paper_url ? h("a", { href: b.paper_url, target: "_blank", rel: "noopener" }, `${b.paper_label || "Paper"} ↗`) : null,
-          b.data_url ? h("a", { href: b.data_url, target: "_blank", rel: "noopener" }, "Dataset / Challenge ↗") : null)));
+      const refs = (S.reg.literature_references || []).map(r =>
+        h("div", { class: "bench-card" },
+          h("div", { style: { display: "flex", justifyContent: "space-between", gap: "8px", alignItems: "flex-start" } },
+            h("h3", null, r.name),
+            h("span", { class: "badge warn" }, r.status)),
+          h("div", { class: "small muted" }, r.developer),
+          h("p", null, r.scope),
+          r.paper_url ? h("a", { class: "small", href: r.paper_url, target: "_blank", rel: "noopener noreferrer", style: { marginTop: "auto" } }, `${r.paper_label || "Reference"} ↗`) : null));
 
-    const refs = (S.reg.literature_references || []).map(r =>
-      h("div", { class: "bench-card" },
-        h("div", { style: { display: "flex", justifyContent: "space-between", gap: "8px", alignItems: "flex-start" } },
-          h("h3", null, r.name),
-          h("span", { class: "badge warn" }, r.status)),
-        h("div", { class: "small muted" }, r.developer),
-        h("p", null, r.scope),
-        r.paper_url ? h("a", { class: "small", href: r.paper_url, target: "_blank", rel: "noopener", style: { marginTop: "auto" } }, `${r.paper_label || "Reference"} ↗`) : null));
+      root.replaceChildren(
+        h("div", { style: { marginTop: "20px" } },
+          h("h3", { id: "papersCountTitle", style: { marginBottom: "10px" } }, ""),
+          h("div", { class: "rack-toolbar", style: { marginBottom: "12px" } },
+            h("div", { class: "search-wrap", style: { flex: "1 1 320px", maxWidth: "460px" } },
+              h("label", { class: "sr-only", for: "paperSearch" }, "Filter papers (press / to focus)"),
+              searchInput,
+              h("kbd", { class: "kbd-hint", id: "paperKbdHint", "aria-hidden": "true" }, "/")),
+            h("div", { class: "rack-exports" },
+              h("button", {
+                id: "papersExportBib",
+                class: "btn ghost small",
+                type: "button",
+                onclick: () => exportModelsBibtex(filteredPapers(), S.paperQ ? "neurorad_fm_papers_filtered.bib" : "neurorad_fm_all28.bib")
+              }, "↓ Export BibTeX"),
+              h("button", {
+                id: "papersExportCsv",
+                class: "btn ghost small",
+                type: "button",
+                onclick: () => exportModelsCsv(filteredPapers(), S.paperQ ? "neurorad_fm_papers_filtered.csv" : "neurorad_fm_all28.csv")
+              }, "↓ Export CSV"))),
+          h("div", { id: "papersTableHost" })),
+        benches.length ? h("div", { style: { marginTop: "32px" } },
+          h("h3", null, "Key neuroimaging benchmarks & open archives"),
+          h("p", { class: "small muted", style: { marginTop: "4px" } }, "Standard 3D tumor, stroke, intracranial hemorrhage, neurodegeneration, and fMRI datasets used to pretrain and evaluate these models."),
+          h("div", { class: "bench-grid" }, benches)) : null,
+        refs.length ? h("div", { style: { marginTop: "32px" } },
+          h("h3", null, "Ecosystem suites & closed-weight literature references"),
+          h("p", { class: "small muted", style: { marginTop: "4px" } }, "Core neuroimaging infrastructure and proprietary models included for citation completeness."),
+          h("div", { class: "bench-grid" }, refs)) : null
+      );
+    } else if ($("#paperSearch") && $("#paperSearch").value !== S.paperQ) {
+      $("#paperSearch").value = S.paperQ;
+    }
 
-    root.replaceChildren(
-      h("div", { style: { marginTop: "20px" } },
-        h("h3", { style: { marginBottom: "10px" } }, `Open-weight brain radiology foundation models (${models.length})`),
-        searchInput,
-        tbl),
-      benches.length ? h("div", { style: { marginTop: "32px" } },
-        h("h3", null, "Key neuroimaging benchmarks & open archives"),
-        h("p", { class: "small muted", style: { marginTop: "4px" } }, "Standard 3D tumor, stroke, intracranial hemorrhage, neurodegeneration, and fMRI datasets used to pretrain and evaluate these models."),
-        h("div", { class: "bench-grid" }, benches)) : null,
-      refs.length ? h("div", { style: { marginTop: "32px" } },
-        h("h3", null, "Ecosystem suites & closed-weight literature references"),
-        h("p", { class: "small muted", style: { marginTop: "4px" } }, "Core neuroimaging infrastructure and proprietary models included for citation completeness."),
-        h("div", { class: "bench-grid" }, refs)) : null
-    );
+    syncSearchKbdHints();
+    updatePapersTable();
   }
 
   /* ── run form ───────────────────────────────────────────────────────────── */
   function openInRun(modelId) {
+    const m = S.reg?.models.find(x => x.id === modelId);
+    const sc = activeScenarioObj();
+    const preferredTask = (m && sc.preferTask && m.tasks.includes(sc.preferTask)) ? sc.preferTask : null;
     go("run");
     $("#rModel").value = modelId;
-    onModelChange();
+    onModelChange(preferredTask);
   }
 
   function renderRunModelOptions() {
@@ -540,7 +1137,7 @@
     return b ? b.dataset.task : currentModel().tasks[0];
   }
 
-  function onModelChange() {
+  function onModelChange(preferredTask) {
     const m = currentModel();
     const rdy = S.ready[m.id];
     const hint = $("#rModelHint");
@@ -548,9 +1145,10 @@
       ? `${m.arch} · ${m.voxel_spec} · Demo mode synthesizes a 3D brain phantom in your browser.`
       : (rdy && !rdy.ready ? `Not ready on server: ${rdy.reason}` : `${m.arch} · ${m.voxel_spec} · ${m.licence}`);
 
+    const activeTask = (typeof preferredTask === "string" && m.tasks.includes(preferredTask)) ? preferredTask : m.tasks[0];
     const bar = $("#rTasks");
-    bar.replaceChildren(...m.tasks.map((t, i) => h("button", {
-      type: "button", "data-task": t, "aria-pressed": String(i === 0),
+    bar.replaceChildren(...m.tasks.map(t => h("button", {
+      type: "button", "data-task": t, "aria-pressed": String(t === activeTask),
       onclick: () => { $$("#rTasks button").forEach(x => x.setAttribute("aria-pressed", String(x.dataset.task === t))); onTaskChange(); }
     }, S.reg.tasks[t]?.label || t)));
     onTaskChange();
@@ -669,7 +1267,7 @@
       h("h3", null, m.name),
       h("p", { class: "small muted" }, m.notes),
       m.seq_hint ? h("p", { class: "small" }, h("strong", null, "Expected scan: "), m.seq_hint) : null,
-      m.paper_url ? h("p", { class: "small" }, "Paper: ", h("a", { href: m.paper_url, target: "_blank", rel: "noopener" }, `${m.paper_label || "Read publication"} ↗`)) : null,
+      m.paper_url ? h("p", { class: "small" }, "Paper: ", h("a", { href: m.paper_url, target: "_blank", rel: "noopener noreferrer" }, `${m.paper_label || "Read publication"} ↗`)) : null,
       h("div", null, h("h3", { style: { marginBottom: "6px" } }, "Outputs"),
         h("ul", null, td.outputs.map(o => h("li", null, o)))),
       h("div", null, h("h3", { style: { marginBottom: "4px" } }, "Hardware & weights"),
@@ -679,7 +1277,7 @@
           `First run will download ~${wi.missing_gb} GB from Hugging Face (or pre-fetch under Connect).`) : null),
       m.gated ? h("div", { class: "alert warn" },
         "Gated Hugging Face weights: accept the licence on ",
-        h("a", { href: m.link, target: "_blank", rel: "noopener" }, m.hf_repo || "the model page"),
+        h("a", { href: m.link, target: "_blank", rel: "noopener noreferrer" }, m.hf_repo || "the model page"),
         " and authenticate via `hf auth login` or add your token under Connect.") : null);
   }
 
@@ -708,10 +1306,15 @@
     const box = $("#volThumbs");
     box.replaceChildren(...S.volFiles.map((f, i) => {
       const isImg = /^image\//.test(f.type);
+      let imgEl = null;
+      if (isImg) {
+        const blobUrl = URL.createObjectURL(f);
+        imgEl = h("img", { src: blobUrl, alt: "", onload: () => URL.revokeObjectURL(blobUrl) });
+      }
       return h("span", { class: "thumb" },
-        isImg ? h("img", { src: URL.createObjectURL(f), alt: "" }) : h("span", { class: "vol-pill" }, "3D"),
+        imgEl || h("span", { class: "vol-pill" }, "3D"),
         f.name.slice(0, 24),
-        h("button", { type: "button", "aria-label": "Remove", onclick: () => { S.volFiles.splice(i, 1); renderVolThumbs(); } }, "✕"));
+        h("button", { type: "button", "aria-label": `Remove ${f.name}`, onclick: () => { S.volFiles.splice(i, 1); renderVolThumbs(); } }, "✕"));
     }));
   }
 
@@ -922,9 +1525,10 @@
       h("span", { class: ok ? "badge ok" : "badge" }, `${k}${ok ? " ✓" : " —"}`));
     const readyCount = Object.values(S.ready).filter(r => r.ready).length;
     const hw = S.health.hardware || {};
-    const gpuLine = hw.gpus?.length
-      ? hw.gpus.map(g => `${g.name} (${g.vram_total_gb} GB${g.vram_free_gb != null ? `, ${g.vram_free_gb} GB free` : ""})`).join("; ")
-      : (S.health.gpu || "None usable by PyTorch");
+    const gpuList = hw.gpus?.length ? hw.gpus : (hw.driver_gpus || []);
+    const gpuLine = gpuList.length
+      ? gpuList.map(g => `${g.name} (${g.vram_total_gb} GB${g.vram_free_gb != null ? `, ${g.vram_free_gb} GB free` : ""})`).join("; ")
+      : (hw.mps_available ? "Apple Silicon MPS" : (S.health.gpu || "None usable by PyTorch"));
     box.replaceChildren(
       h("h3", null, "Server status"),
       h("dl", { class: "kv" },
@@ -974,7 +1578,7 @@
 
       const acc = w.parts.map(p => p.access);
       const accCell = !m.gated ? (m.hf_repo ? "Public HF" : "GitHub / pip")
-        : acc.includes("no-access") ? h("a", { href: m.link, target: "_blank", rel: "noopener", class: "badge warn" }, "Request on HF ↗")
+        : acc.includes("no-access") ? h("a", { href: m.link, target: "_blank", rel: "noopener noreferrer", class: "badge warn" }, "Request on HF ↗")
         : acc.includes("ok") ? h("span", { class: "badge ok" }, "Granted")
         : "Gated (unchecked)";
 
@@ -984,7 +1588,7 @@
       } else if (w.overall === "cached") {
         act = h("span", { class: "small muted" }, "✓ Ready");
       } else if (w.overall === "manual") {
-        act = h("a", { class: "small", href: m.link, target: "_blank", rel: "noopener" }, "Instructions ↗");
+        act = h("a", { class: "small", href: m.link, target: "_blank", rel: "noopener noreferrer" }, "Instructions ↗");
       } else {
         act = h("button", {
           class: "btn ghost small", type: "button",
@@ -1026,32 +1630,96 @@
     }
   }
 
+  /* ── global keyboard shortcuts (`/` search focus & `Escape` dismissal) ──── */
+  function syncSearchKbdHints() {
+    const qHint = $("#qKbdHint");
+    if (qHint && $("#q")) qHint.hidden = Boolean($("#q").value);
+    const pHint = $("#paperKbdHint");
+    if (pHint && $("#paperSearch")) pHint.hidden = Boolean($("#paperSearch").value);
+  }
+
+  function isEditableTarget(el) {
+    if (!el) return false;
+    const tag = el.tagName;
+    return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || el.isContentEditable;
+  }
+
+  function initKeyboardShortcuts() {
+    document.addEventListener("keydown", e => {
+      if (e.key === "Escape") {
+        hideTip();
+        const cmp = $("#compareModal");
+        const drw = $("#drawer");
+        if (cmp?.open) { cmp.close(); return; }
+        if (drw?.open) { drw.close(); return; }
+        const active = document.activeElement;
+        if (active && (active.id === "q" || active.id === "paperSearch")) {
+          if (active.value) {
+            active.value = "";
+            active.dispatchEvent(new Event("input", { bubbles: true }));
+          } else {
+            active.blur();
+          }
+        }
+        return;
+      }
+
+      if (e.key === "/" && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        if (isEditableTarget(e.target)) return;
+        if ($("#compareModal")?.open || $("#drawer")?.open) return;
+        e.preventDefault();
+        if (S.view === "papers") {
+          const ps = $("#paperSearch");
+          if (ps) { ps.focus(); ps.select(); }
+          return;
+        }
+        if (S.view !== "models") go("models");
+        const qInput = $("#q");
+        if (qInput) { qInput.focus(); qInput.select(); }
+      }
+    });
+  }
+
   /* ── boot ───────────────────────────────────────────────────────────────── */
   async function boot() {
     initTheme();
+    initKeyboardShortcuts();
     $$("[data-view]").forEach(b => b.addEventListener("click", () => go(b.dataset.view)));
     window.addEventListener("hashchange", () => go(location.hash.slice(1)));
 
     const res = await fetch("models.json");
     S.reg = await res.json();
+    const validIds = new Set(S.reg.models.map(m => m.id));
+    S.pinned = S.pinned.filter(id => validIds.has(id)).slice(0, 4);
     $("#regDate").textContent = S.reg.version;
 
-    $("#q").oninput = e => { S.filter.q = e.target.value; renderCatalogue(); };
+    $("#q").oninput = e => {
+      S.filter.q = e.target.value;
+      syncSearchKbdHints();
+      renderCatalogue();
+    };
     $("#fCommercial").onchange = e => { S.filter.commercial = e.target.checked; renderCatalogue(); };
     $("#fUngated").onchange = e => { S.filter.ungated = e.target.checked; renderCatalogue(); };
     $("#fReady").onchange = e => { S.filter.ready = e.target.checked; renderCatalogue(); };
     $("#fHw").onchange = e => { S.filter.hwFit = e.target.checked; renderCatalogue(); };
-    $("#rModel").onchange = onModelChange;
+    $("#rModel").onchange = () => onModelChange();
     $("#runForm").onsubmit = submitRun;
     $("#refreshJobs").onclick = refreshJobs;
     $("#drawer").onclick = e => { if (e.target === $("#drawer")) $("#drawer").close(); };
+    $("#compareModal").onclick = e => { if (e.target === $("#compareModal")) $("#compareModal").close(); };
 
     initDrop();
     initConnect();
     renderFilters();
     renderRunModelOptions();
+    renderCompareDock();
     go(location.hash.slice(1) || "models");
-    window.Hardware.detectBrowser().then(bw => { S.browserHw = bw; renderHardwareBar(); renderCatalogue(); });
+    window.Hardware.detectBrowser().then(bw => {
+      S.browserHw = bw;
+      renderHardwareBar();
+      renderCatalogue();
+      if ($("#compareModal")?.open) renderCompareModal();
+    });
     probe();
   }
 
