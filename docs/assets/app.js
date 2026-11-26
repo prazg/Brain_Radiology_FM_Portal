@@ -31,7 +31,14 @@
     pinned: loadSavedPinned(),
     dockMsg: "",
     dockMsgTimer: null,
+    toastTimer: null,
+    dsQ: "",
+    dsCat: "all",
+    dsAccess: "all",
+    benchMod: "all",
     paperQ: "",
+    paperKind: "all",
+    paperYear: "all",
     mode: localStorage.getItem("neuro_fm_mode") || "demo",
     url: (localStorage.getItem("neuro_fm_url") || "http://127.0.0.1:8000").replace(/\/+$/, ""),
     key: localStorage.getItem("neuro_fm_key") || "",
@@ -224,6 +231,39 @@
     return lines.join("\n");
   }
 
+  function showToast(msg) {
+    const el = $("#toast");
+    if (!el) return;
+    el.textContent = msg;
+    el.hidden = false;
+    clearTimeout(S.toastTimer);
+    S.toastTimer = setTimeout(() => { el.hidden = true; }, 2600);
+  }
+
+  function copyText(text, toastMsg) {
+    const ok = () => { if (toastMsg) showToast(toastMsg); };
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(text).then(ok).catch(() => {
+        fallbackCopy(text);
+        ok();
+      });
+    } else {
+      fallbackCopy(text);
+      ok();
+    }
+  }
+
+  function fallbackCopy(text) {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand("copy"); } catch {}
+    ta.remove();
+  }
+
   function downloadBlobFile(filename, content, mime) {
     const blob = new Blob([content], { type: mime });
     const url = URL.createObjectURL(blob);
@@ -239,6 +279,7 @@
     const header = `% Brain Radiology FM Portal (NeuroRad-FM) — ${models.length} neuroimaging foundation model citation(s)\n% Generated ${new Date().toISOString().slice(0, 10)}\n\n`;
     const body = models.map(bibtexFor).join("\n\n") + "\n";
     downloadBlobFile(filename, header + body, "application/x-bibtex;charset=utf-8");
+    showToast(`Exported ${models.length} model BibTeX entries`);
   }
 
   function exportModelsCsv(models, filename = "neurorad_fm_models.csv") {
@@ -278,6 +319,59 @@
     const csvCell = v => `"${String(v ?? "").replace(/"/g, '""')}"`;
     const txt = "\uFEFF" + [cols.map(csvCell).join(","), ...rows.map(r => r.map(csvCell).join(","))].join("\r\n") + "\r\n";
     downloadBlobFile(filename, txt, "text/csv;charset=utf-8");
+    showToast(`Exported ${models.length} models to CSV`);
+  }
+
+  function exportDatasetsBibtex(datasets, filename = "neurorad_fm_datasets.bib") {
+    if (!datasets || !datasets.length) return;
+    const header = `% Brain Radiology FM Portal (NeuroRad-FM) — ${datasets.length} open neuroimaging dataset citation(s)\n% Generated ${new Date().toISOString().slice(0, 10)}\n\n`;
+    const body = datasets.map(d => d.bibtex).filter(Boolean).join("\n\n") + "\n";
+    downloadBlobFile(filename, header + body, "application/x-bibtex;charset=utf-8");
+    showToast(`Exported ${datasets.length} dataset BibTeX entries`);
+  }
+
+  function exportDatasetsCsv(datasets, filename = "neurorad_fm_datasets.csv") {
+    if (!datasets || !datasets.length || !S.reg) return;
+    const cols = ["id", "name", "category", "modality", "cases", "size_label", "access", "access_tier", "license", "year", "venue", "doi", "url", "paper_url", "tasks"];
+    const rows = datasets.map(d => [
+      d.id,
+      d.name,
+      S.reg.dataset_categories?.[d.category]?.label || d.category,
+      (d.modality || []).join("; "),
+      d.cases || "",
+      d.size_label || "",
+      d.access || "",
+      d.access_tier || "",
+      d.license || "",
+      d.year || "",
+      d.venue || "",
+      d.doi || "",
+      d.url || "",
+      d.paper_url || "",
+      (d.tasks || []).join("; ")
+    ]);
+    const csvCell = v => `"${String(v ?? "").replace(/"/g, '""')}"`;
+    const txt = "\uFEFF" + [cols.map(csvCell).join(","), ...rows.map(r => r.map(csvCell).join(","))].join("\r\n") + "\r\n";
+    downloadBlobFile(filename, txt, "text/csv;charset=utf-8");
+    showToast(`Exported ${datasets.length} datasets to CSV`);
+  }
+
+  function exportBibliographyBibtex(items, filename = "neurorad_fm_all_references.bib") {
+    if (!items || !items.length) return;
+    const header = `% Brain Radiology FM Portal (NeuroRad-FM) — ${items.length} model & dataset reference(s)\n% Generated ${new Date().toISOString().slice(0, 10)}\n\n`;
+    const body = items.map(x => x.bibtex).filter(Boolean).join("\n\n") + "\n";
+    downloadBlobFile(filename, header + body, "application/x-bibtex;charset=utf-8");
+    showToast(`Exported ${items.length} BibTeX entries`);
+  }
+
+  function exportBibliographyCsv(items, filename = "neurorad_fm_all_references.csv") {
+    if (!items || !items.length) return;
+    const cols = ["kind", "id", "name", "subtitle", "group", "year", "venue", "paper_url", "code_or_data_url"];
+    const rows = items.map(p => [p.kind, p.id, p.name, p.subtitle, p.group, p.year, p.venue, p.paper_url, p.code_url]);
+    const csvCell = v => `"${String(v ?? "").replace(/"/g, '""')}"`;
+    const txt = "\uFEFF" + [cols.map(csvCell).join(","), ...rows.map(r => r.map(csvCell).join(","))].join("\r\n") + "\r\n";
+    downloadBlobFile(filename, txt, "text/csv;charset=utf-8");
+    showToast(`Exported ${items.length} references to CSV`);
   }
 
   function quickstartSnippet(m) {
@@ -334,7 +428,7 @@
 
   /* ── navigation ─────────────────────────────────────────────────────────── */
   function go(view) {
-    if (!["models", "run", "results", "papers", "connect"].includes(view)) view = "models";
+    if (!["models", "datasets", "benchmarks", "run", "results", "papers", "connect"].includes(view)) view = "models";
     S.view = view;
     hideTip();
     $$("main > section").forEach(s => { s.hidden = s.id !== "view-" + view; });
@@ -343,6 +437,8 @@
       else b.removeAttribute("aria-current");
     });
     if (location.hash !== "#" + view) history.replaceState(null, "", "#" + view);
+    if (view === "datasets") renderDatasets();
+    if (view === "benchmarks") renderBenchmarks();
     if (view === "results") refreshJobs();
     if (view === "papers") renderPapers();
   }
@@ -862,8 +958,12 @@
     const openCnt = S.reg.models.filter(m => !m.gated).length;
     const commCnt = S.reg.models.filter(m => m.commercial_use).length;
     const ctCnt   = S.reg.models.filter(m => m.modality === "ct" || m.modality === "mri_ct").length;
+    const dsCnt   = (S.reg.datasets || []).length;
+    const bnCnt   = (S.reg.benchmarks || []).length;
     $("#counts").replaceChildren(
       h("div", null, h("strong", null, S.reg.models.length), "3D neuro FMs"),
+      h("div", null, h("strong", null, dsCnt), "open datasets"),
+      h("div", null, h("strong", null, bnCnt), "benchmarks"),
       h("div", null, h("strong", null, openCnt), "ungated weights"),
       h("div", null, h("strong", null, ctCnt), "Head CT capable"),
       h("div", null, h("strong", null, commCnt), "permissive licence"));
@@ -967,12 +1067,258 @@
     if (!dlg.open) dlg.showModal();
   }
 
-  /* ── Papers, Citations & Benchmarks view (focus-preserving search) ──────── */
+  /* ── Open-Access Neuroimaging Datasets view ─────────────────────────────── */
+  function filteredDatasets() {
+    if (!S.reg?.datasets) return [];
+    const q = (S.dsQ || "").trim().toLowerCase();
+    return S.reg.datasets.filter(d => {
+      if (S.dsCat !== "all" && d.category !== S.dsCat) return false;
+      if (S.dsAccess !== "all" && d.access_tier !== S.dsAccess) return false;
+      if (q) {
+        const catLbl = S.reg.dataset_categories?.[d.category]?.label || "";
+        const hay = [
+          d.name, catLbl, d.cases, d.size_label, d.annotations, d.access, d.license,
+          d.venue, d.year, d.doi, (d.modality || []).join(" "), (d.tasks || []).join(" "), d.cli_hint
+        ].join(" ").toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      return true;
+    });
+  }
+
+  function resetDatasetFilters() {
+    S.dsQ = "";
+    S.dsCat = "all";
+    S.dsAccess = "all";
+    if ($("#datasetSearch")) $("#datasetSearch").value = "";
+    if ($("#datasetCategory")) $("#datasetCategory").value = "all";
+    if ($("#datasetAccess")) $("#datasetAccess").value = "all";
+    syncSearchKbdHints();
+    renderDatasets();
+  }
+
+  function renderDatasets() {
+    const grid = $("#datasetsGrid");
+    const bar = $("#datasetToolbar");
+    if (!grid || !S.reg?.datasets) return;
+    const items = filteredDatasets();
+    const total = S.reg.datasets.length;
+    const active = Boolean(S.dsQ || S.dsCat !== "all" || S.dsAccess !== "all");
+
+    if (bar) {
+      bar.replaceChildren(
+        h("div", { class: "rack-status" },
+          h("span", null, "Showing ", h("strong", null, items.length), ` of ${total} open-access brain & neuroimaging datasets`),
+          active ? h("button", { class: "link-btn", type: "button", onclick: resetDatasetFilters }, "Reset filters") : null)
+      );
+    }
+
+    const expBib = $("#exportDatasetsBib");
+    const expCsv = $("#exportDatasetsCsv");
+    if (expBib) {
+      expBib.textContent = `↓ Dataset BibTeX (${items.length} .bib)`;
+      expBib.disabled = !items.length;
+    }
+    if (expCsv) {
+      expCsv.textContent = `↓ Dataset CSV (${items.length})`;
+      expCsv.disabled = !items.length;
+    }
+
+    if (!items.length) {
+      grid.replaceChildren(h("div", { class: "empty", style: { gridColumn: "1 / -1" } },
+        "No neuroimaging datasets match those filters. ",
+        h("button", { class: "link-btn", type: "button", onclick: resetDatasetFilters }, "Reset all filters")));
+      return;
+    }
+
+    grid.replaceChildren(...items.map(d => {
+      const accessCls = d.access_tier === "open" ? "badge ok" : (d.access_tier === "registration" ? "badge accent" : "badge warn");
+      const cliBtn = h("button", {
+        class: "btn ghost small", type: "button",
+        onclick: () => {
+          copyText(d.cli_hint || "", `Copied download command for ${d.name}`);
+          cliBtn.textContent = "Copied!";
+          setTimeout(() => { cliBtn.textContent = "Copy CLI"; }, 1300);
+        }
+      }, "Copy CLI");
+      const bibBtn = h("button", {
+        class: "btn ghost small", type: "button",
+        onclick: () => {
+          copyText(d.bibtex || "", `Copied BibTeX for ${d.name}`);
+          bibBtn.textContent = "Copied!";
+          setTimeout(() => { bibBtn.textContent = "Copy BibTeX"; }, 1300);
+        }
+      }, "Copy BibTeX");
+
+      return h("article", { class: `dataset-card cat-${d.category}` },
+        h("div", { class: "slide-top" },
+          h("div", { style: { minWidth: 0 } },
+            h("div", { class: "slide-name" }, d.name),
+            h("div", { class: "slide-org" }, `${d.venue} · ${d.year} · DOI: ${d.doi}`)),
+          h("span", { class: accessCls }, d.access)),
+        h("div", { class: "dataset-meta-grid" },
+          h("div", null, h("div", { class: "meta-k" }, "Cohort Scale"), h("div", { class: "meta-v" }, d.cases)),
+          h("div", null, h("div", { class: "meta-k" }, "Format & Size"), h("div", { class: "meta-v" }, d.size_label))),
+        h("p", { class: "dataset-desc" }, d.annotations),
+        h("div", { class: "badges" },
+          ...(d.modality || []).map(mod => h("span", { class: "badge accent" }, mod)),
+          ...(d.tasks || []).map(t => h("span", { class: "badge" }, t)),
+          h("span", { class: "badge" }, d.license)),
+        d.cli_hint ? h("pre", { class: "dataset-cli" }, d.cli_hint) : null,
+        h("div", { class: "dataset-foot" },
+          h("div", { class: "card-links" },
+            h("a", { href: d.url, target: "_blank", rel: "noopener noreferrer" }, "Dataset Portal ↗"),
+            h("a", { href: d.paper_url || `https://doi.org/${d.doi}`, target: "_blank", rel: "noopener noreferrer" }, "Paper / DOI ↗")),
+          h("div", { class: "rack-exports" }, cliBtn, bibBtn)));
+    }));
+  }
+
+  /* ── Neuroimaging Benchmarks & Visual Leaderboards view ─────────────────── */
+  function renderBenchmarks() {
+    const grid = $("#benchmarksGrid");
+    const bar = $("#benchmarkToolbar");
+    const ecoGrid = $("#ecosystemGrid");
+    const refGrid = $("#litRefGrid");
+    if (!grid || !S.reg?.benchmarks) return;
+
+    const allB = S.reg.benchmarks;
+    const items = allB.filter(b => S.benchMod === "all" || b.modality === S.benchMod);
+
+    if (bar) {
+      bar.replaceChildren(
+        h("div", { class: "rack-status" },
+          h("span", null, "Showing ", h("strong", null, items.length), ` of ${allB.length} clinical neuroimaging benchmarks`),
+          S.benchMod !== "all" ? h("button", {
+            class: "link-btn", type: "button",
+            onclick: () => {
+              S.benchMod = "all";
+              if ($("#benchmarkModality")) $("#benchmarkModality").value = "all";
+              renderBenchmarks();
+            }
+          }, "Show all modalities") : null)
+      );
+    }
+
+    if (!items.length) {
+      grid.replaceChildren(h("div", { class: "empty", style: { gridColumn: "1 / -1" } }, "No benchmarks match that modality filter."));
+    } else {
+      grid.replaceChildren(...items.map(b => {
+        const dec = b.decimals ?? 3;
+        const maxVal = b.scale_max || 1.0;
+        const rows = (b.entries || []).map(e => {
+          let pct;
+          if (b.lower_is_better) {
+            const floor = Math.min(1.5, e.score * 0.5);
+            pct = Math.max(18, Math.min(100, Math.round((1 - (e.score - floor) / Math.max(0.1, maxVal - floor)) * 100)));
+          } else {
+            pct = Math.max(8, Math.min(100, Math.round((e.score / maxVal) * 100)));
+          }
+          const scoreTxt = e.display || `${Number(e.score).toFixed(dec)}${b.unit ? " " + b.unit : ""}`;
+          const targetModel = S.reg.models.find(m => m.id === e.model_id);
+          return h("div", { class: "bench-row" },
+            h("div", { class: "bench-row-head" },
+              h("span", { style: { minWidth: 0 } },
+                h("button", {
+                  class: "bench-model-btn",
+                  type: "button",
+                  title: targetModel ? `Inspect ${targetModel.name} architecture, hardware fit & CLI` : e.model,
+                  onclick: () => { if (targetModel) openDrawer(targetModel); }
+                }, e.model),
+                e.secondary ? h("span", { class: "bench-sec" }, e.secondary) : null),
+              h("span", { class: "bench-score" }, scoreTxt)),
+            h("div", { class: "bench-track" },
+              h("div", { class: `bench-fill${e.highlight ? " top" : ""}`, style: { width: `${pct}%` } })));
+        });
+
+        return h("article", { class: "bench-lb-card" },
+          h("div", { class: "bench-lb-top" },
+            h("div", { style: { minWidth: 0 } },
+              h("h3", { style: { fontSize: "1.05rem" } }, b.name),
+              h("div", { class: "bench-cohort" }, b.cohort || b.modality)),
+            h("span", { class: "badge accent" }, `${b.modality} · ${b.metric_name || "Score"}`)),
+          h("p", { class: "dataset-desc" }, b.description || b.scope),
+          h("div", { class: "bench-rows" }, ...rows),
+          h("div", { class: "bench-foot" },
+            h("div", { class: "card-links" },
+              b.url || b.data_url ? h("a", { href: b.url || b.data_url, target: "_blank", rel: "noopener noreferrer" }, "Challenge / Portal ↗") : null,
+              b.paper_url || b.doi ? h("a", { href: b.paper_url || `https://doi.org/${b.doi}`, target: "_blank", rel: "noopener noreferrer" }, `Reference (${b.paper_label || "DOI"}) ↗`) : null),
+            h("span", { class: "small muted mono" }, "Click any model to inspect")));
+      }));
+    }
+
+    if (ecoGrid && S.reg.ecosystem) {
+      ecoGrid.replaceChildren(...S.reg.ecosystem.map(eco =>
+        h("article", { class: "eco-card" },
+          h("div", { class: "eco-role" }, eco.role),
+          h("h3", { style: { fontSize: "0.98rem" } },
+            h("a", { href: eco.url, target: "_blank", rel: "noopener noreferrer" }, `${eco.name} ↗`)),
+          h("p", null, eco.description))));
+    }
+
+    if (refGrid && S.reg.literature_references) {
+      refGrid.replaceChildren(...S.reg.literature_references.map(r =>
+        h("div", { class: "bench-card" },
+          h("div", { style: { display: "flex", justifyContent: "space-between", gap: "8px", alignItems: "flex-start" } },
+            h("h3", null, r.name),
+            h("span", { class: "badge warn" }, r.status)),
+          h("div", { class: "small muted" }, r.developer),
+          h("p", null, r.scope),
+          r.paper_url ? h("a", { class: "small", href: r.paper_url, target: "_blank", rel: "noopener noreferrer", style: { marginTop: "auto" } }, `${r.paper_label || "Reference"} ↗`) : null)));
+    }
+  }
+
+  /* ── Papers & BibTeX view (Models + Open Datasets unified, focus-preserving) */
+  function allBibliographyItems() {
+    if (!S.reg) return [];
+    const mItems = S.reg.models.map(m => {
+      const meta = parseCitationMeta(m);
+      return {
+        kind: "model",
+        id: m.id,
+        name: m.name,
+        subtitle: m.developer,
+        group: S.reg.categories[m.category]?.label || m.category,
+        badgeCls: `badge mod-${m.modality}`,
+        badgeLabel: modBadgeLabel(m.modality),
+        year: Number(meta.year) || 2025,
+        venue: m.paper_label || "Preprint",
+        citation: m.citation || "",
+        paper_url: m.paper_url || m.link,
+        code_url: m.link,
+        code_label: m.hf_repo || "GitHub / Release",
+        bibtex: bibtexFor(m)
+      };
+    });
+    const dItems = (S.reg.datasets || []).map(d => ({
+      kind: "dataset",
+      id: d.id,
+      name: d.name,
+      subtitle: d.cases,
+      group: `Dataset · ${S.reg.dataset_categories?.[d.category]?.label || d.category}`,
+      badgeCls: "badge ok",
+      badgeLabel: "Open Dataset",
+      year: Number(d.year) || 2022,
+      venue: `${d.venue} (${d.year})`,
+      citation: `DOI: ${d.doi} · ${d.license}`,
+      paper_url: d.paper_url || `https://doi.org/${d.doi}`,
+      code_url: d.url,
+      code_label: "Dataset Portal",
+      bibtex: d.bibtex
+    }));
+    return [...mItems, ...dItems];
+  }
+
   function filteredPapers() {
-    const q = (S.paperQ || "").toLowerCase();
-    return S.reg.models.filter(m => {
-      if (!q) return true;
-      return `${m.name} ${m.developer} ${m.citation || ""} ${m.paper_label || ""} ${m.paper_url || ""} ${m.modality}`.toLowerCase().includes(q);
+    const q = (S.paperQ || "").trim().toLowerCase();
+    return allBibliographyItems().filter(p => {
+      if (S.paperKind !== "all" && p.kind !== S.paperKind) return false;
+      if (S.paperYear === "older" && p.year > 2022) return false;
+      else if (S.paperYear !== "all" && S.paperYear !== "older" && String(p.year) !== S.paperYear) return false;
+      if (q) {
+        const hay = `${p.name} ${p.subtitle} ${p.group} ${p.venue} ${p.citation} ${p.paper_url} ${p.bibtex}`.toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      return true;
     });
   }
 
@@ -983,43 +1329,46 @@
     const expCsvBtn = $("#papersExportCsv");
     if (!tblHost || !S.reg) return;
 
-    const models = filteredPapers();
-    if (countEl) countEl.textContent = `Open-weight brain radiology foundation models (${models.length})`;
+    const items = filteredPapers();
+    const total = allBibliographyItems().length;
+    if (countEl) countEl.textContent = `Verified models & datasets bibliography (${items.length} of ${total})`;
     if (expBibBtn) {
-      expBibBtn.textContent = `↓ Export BibTeX (${models.length} .bib)`;
-      expBibBtn.disabled = !models.length;
+      expBibBtn.textContent = `↓ Export BibTeX (${items.length} .bib)`;
+      expBibBtn.disabled = !items.length;
     }
     if (expCsvBtn) {
-      expCsvBtn.textContent = `↓ Export CSV (${models.length})`;
-      expCsvBtn.disabled = !models.length;
+      expCsvBtn.textContent = `↓ Export CSV (${items.length})`;
+      expCsvBtn.disabled = !items.length;
     }
 
-    if (!models.length) {
+    if (!items.length) {
       tblHost.replaceChildren(h("div", { class: "empty" }, "No publications match that filter."));
       return;
     }
 
     tblHost.replaceChildren(
-      h("div", { class: "w-table-wrap" },
+      h("div", { class: "w-table-wrap", style: { maxHeight: "620px" } },
         h("table", { class: "tbl w-table" },
-          h("thead", null, h("tr", null, ["Model", "Modality", "Family", "Publication / Preprint", "Weights / Code", "BibTeX"].map(c => h("th", null, c)))),
-          h("tbody", null, models.map(m => {
+          h("thead", null, h("tr", null, ["Item", "Type / Modality", "Year", "Publication / Preprint", "Links", "BibTeX"].map(c => h("th", null, c)))),
+          h("tbody", null, items.map(p => {
             const bibBtn = h("button", {
               class: "btn ghost small", type: "button",
               onclick: () => {
-                navigator.clipboard?.writeText(bibtexFor(m));
+                copyText(p.bibtex, `Copied BibTeX for ${p.name}`);
                 bibBtn.textContent = "Copied!";
                 setTimeout(() => { bibBtn.textContent = "Copy BibTeX"; }, 1300);
               }
             }, "Copy BibTeX");
             return h("tr", null,
-              h("td", null, h("strong", null, m.name), h("div", { class: "small muted" }, m.developer)),
-              h("td", null, h("span", { class: `badge mod-${m.modality}` }, modBadgeLabel(m.modality))),
-              h("td", { class: "small" }, S.reg.categories[m.category]?.label || m.category),
+              h("td", null, h("strong", null, p.name), h("div", { class: "small muted" }, p.subtitle)),
+              h("td", null,
+                h("span", { class: p.badgeCls }, p.badgeLabel),
+                h("div", { class: "small muted", style: { marginTop: "3px" } }, p.group)),
+              h("td", { class: "mono small" }, String(p.year)),
               h("td", { class: "small" },
-                m.paper_url ? h("a", { href: m.paper_url, target: "_blank", rel: "noopener noreferrer" }, `${m.paper_label} ↗`) : (m.paper_label || "—"),
-                m.citation ? h("div", { class: "muted", style: { fontSize: "0.78rem" } }, m.citation) : null),
-              h("td", { class: "small" }, h("a", { href: m.link, target: "_blank", rel: "noopener noreferrer" }, m.hf_repo || "GitHub / Release")),
+                p.paper_url ? h("a", { href: p.paper_url, target: "_blank", rel: "noopener noreferrer" }, `${p.venue} ↗`) : p.venue,
+                p.citation ? h("div", { class: "muted", style: { fontSize: "0.78rem" } }, p.citation) : null),
+              h("td", { class: "small" }, h("a", { href: p.code_url, target: "_blank", rel: "noopener noreferrer" }, `${p.code_label} ↗`)),
               h("td", null, bibBtn)
             );
           }))))
@@ -1031,12 +1380,14 @@
     if (!root || !S.reg) return;
 
     if (!$("#papersTableHost")) {
+      const mCnt = S.reg.models.length;
+      const dCnt = (S.reg.datasets || []).length;
       const searchInput = h("input", {
         id: "paperSearch",
         class: "search",
         type: "search",
         value: S.paperQ,
-        placeholder: "Filter papers by model, author, journal, MRI/CT, or DOI…",
+        placeholder: "Filter by model, dataset, author, journal (Nature, IEEE TMI, Sci. Data), or DOI…",
         oninput: e => {
           S.paperQ = e.target.value;
           syncSearchKbdHints();
@@ -1044,55 +1395,53 @@
         }
       });
 
-      const benches = (S.reg.benchmarks || []).map(b =>
-        h("div", { class: "bench-card" },
-          h("div", { style: { display: "flex", justifyContent: "space-between", gap: "8px", alignItems: "flex-start" } },
-            h("h3", null, b.name),
-            h("span", { class: "badge accent" }, b.modality)),
-          h("p", null, b.scope),
-          h("div", { style: { display: "flex", gap: "12px", marginTop: "auto", paddingTop: "6px", fontSize: "0.83rem" } },
-            b.paper_url ? h("a", { href: b.paper_url, target: "_blank", rel: "noopener noreferrer" }, `${b.paper_label || "Paper"} ↗`) : null,
-            b.data_url ? h("a", { href: b.data_url, target: "_blank", rel: "noopener noreferrer" }, "Dataset / Challenge ↗") : null)));
+      const kindSel = h("select", {
+        id: "paperKind",
+        class: "filter-select",
+        "aria-label": "Filter bibliography by item kind",
+        onchange: e => { S.paperKind = e.target.value; updatePapersTable(); }
+      },
+        h("option", { value: "all", selected: S.paperKind === "all" }, `Models + Datasets (${mCnt + dCnt})`),
+        h("option", { value: "model", selected: S.paperKind === "model" }, `Foundation Models (${mCnt})`),
+        h("option", { value: "dataset", selected: S.paperKind === "dataset" }, `Open Datasets (${dCnt})`));
 
-      const refs = (S.reg.literature_references || []).map(r =>
-        h("div", { class: "bench-card" },
-          h("div", { style: { display: "flex", justifyContent: "space-between", gap: "8px", alignItems: "flex-start" } },
-            h("h3", null, r.name),
-            h("span", { class: "badge warn" }, r.status)),
-          h("div", { class: "small muted" }, r.developer),
-          h("p", null, r.scope),
-          r.paper_url ? h("a", { class: "small", href: r.paper_url, target: "_blank", rel: "noopener noreferrer", style: { marginTop: "auto" } }, `${r.paper_label || "Reference"} ↗`) : null));
+      const yearSel = h("select", {
+        id: "paperYear",
+        class: "filter-select",
+        "aria-label": "Filter bibliography by publication year",
+        onchange: e => { S.paperYear = e.target.value; updatePapersTable(); }
+      },
+        h("option", { value: "all", selected: S.paperYear === "all" }, "All years"),
+        h("option", { value: "2026", selected: S.paperYear === "2026" }, "2026"),
+        h("option", { value: "2025", selected: S.paperYear === "2025" }, "2025"),
+        h("option", { value: "2024", selected: S.paperYear === "2024" }, "2024"),
+        h("option", { value: "2023", selected: S.paperYear === "2023" }, "2023"),
+        h("option", { value: "older", selected: S.paperYear === "older" }, "2022 & earlier"));
 
       root.replaceChildren(
         h("div", { style: { marginTop: "20px" } },
           h("h3", { id: "papersCountTitle", style: { marginBottom: "10px" } }, ""),
-          h("div", { class: "rack-toolbar", style: { marginBottom: "12px" } },
-            h("div", { class: "search-wrap", style: { flex: "1 1 320px", maxWidth: "460px" } },
+          h("div", { class: "dataset-filter-bar", style: { marginTop: "0", marginBottom: "12px" } },
+            h("div", { class: "search-wrap", style: { flex: "1 1 300px" } },
               h("label", { class: "sr-only", for: "paperSearch" }, "Filter papers (press / to focus)"),
               searchInput,
               h("kbd", { class: "kbd-hint", id: "paperKbdHint", "aria-hidden": "true" }, "/")),
+            kindSel,
+            yearSel,
             h("div", { class: "rack-exports" },
               h("button", {
                 id: "papersExportBib",
                 class: "btn ghost small",
                 type: "button",
-                onclick: () => exportModelsBibtex(filteredPapers(), S.paperQ ? "neurorad_fm_papers_filtered.bib" : "neurorad_fm_all28.bib")
+                onclick: () => exportBibliographyBibtex(filteredPapers(), (S.paperQ || S.paperKind !== "all" || S.paperYear !== "all") ? "neurorad_fm_refs_filtered.bib" : "neurorad_fm_all_references.bib")
               }, "↓ Export BibTeX"),
               h("button", {
                 id: "papersExportCsv",
                 class: "btn ghost small",
                 type: "button",
-                onclick: () => exportModelsCsv(filteredPapers(), S.paperQ ? "neurorad_fm_papers_filtered.csv" : "neurorad_fm_all28.csv")
+                onclick: () => exportBibliographyCsv(filteredPapers(), (S.paperQ || S.paperKind !== "all" || S.paperYear !== "all") ? "neurorad_fm_refs_filtered.csv" : "neurorad_fm_all_references.csv")
               }, "↓ Export CSV"))),
-          h("div", { id: "papersTableHost" })),
-        benches.length ? h("div", { style: { marginTop: "32px" } },
-          h("h3", null, "Key neuroimaging benchmarks & open archives"),
-          h("p", { class: "small muted", style: { marginTop: "4px" } }, "Standard 3D tumor, stroke, intracranial hemorrhage, neurodegeneration, and fMRI datasets used to pretrain and evaluate these models."),
-          h("div", { class: "bench-grid" }, benches)) : null,
-        refs.length ? h("div", { style: { marginTop: "32px" } },
-          h("h3", null, "Ecosystem suites & closed-weight literature references"),
-          h("p", { class: "small muted", style: { marginTop: "4px" } }, "Core neuroimaging infrastructure and proprietary models included for citation completeness."),
-          h("div", { class: "bench-grid" }, refs)) : null
+          h("div", { id: "papersTableHost" }))
       );
     } else if ($("#paperSearch") && $("#paperSearch").value !== S.paperQ) {
       $("#paperSearch").value = S.paperQ;
@@ -1634,6 +1983,8 @@
   function syncSearchKbdHints() {
     const qHint = $("#qKbdHint");
     if (qHint && $("#q")) qHint.hidden = Boolean($("#q").value);
+    const dHint = $("#datasetKbdHint");
+    if (dHint && $("#datasetSearch")) dHint.hidden = Boolean($("#datasetSearch").value);
     const pHint = $("#paperKbdHint");
     if (pHint && $("#paperSearch")) pHint.hidden = Boolean($("#paperSearch").value);
   }
@@ -1653,7 +2004,7 @@
         if (cmp?.open) { cmp.close(); return; }
         if (drw?.open) { drw.close(); return; }
         const active = document.activeElement;
-        if (active && (active.id === "q" || active.id === "paperSearch")) {
+        if (active && (active.id === "q" || active.id === "datasetSearch" || active.id === "paperSearch")) {
           if (active.value) {
             active.value = "";
             active.dispatchEvent(new Event("input", { bubbles: true }));
@@ -1668,6 +2019,11 @@
         if (isEditableTarget(e.target)) return;
         if ($("#compareModal")?.open || $("#drawer")?.open) return;
         e.preventDefault();
+        if (S.view === "datasets") {
+          const ds = $("#datasetSearch");
+          if (ds) { ds.focus(); ds.select(); }
+          return;
+        }
         if (S.view === "papers") {
           const ps = $("#paperSearch");
           if (ps) { ps.focus(); ps.select(); }
@@ -1702,6 +2058,30 @@
     $("#fUngated").onchange = e => { S.filter.ungated = e.target.checked; renderCatalogue(); };
     $("#fReady").onchange = e => { S.filter.ready = e.target.checked; renderCatalogue(); };
     $("#fHw").onchange = e => { S.filter.hwFit = e.target.checked; renderCatalogue(); };
+
+    if ($("#datasetSearch")) {
+      $("#datasetSearch").oninput = e => {
+        S.dsQ = e.target.value;
+        syncSearchKbdHints();
+        renderDatasets();
+      };
+    }
+    if ($("#datasetCategory")) {
+      $("#datasetCategory").onchange = e => { S.dsCat = e.target.value; renderDatasets(); };
+    }
+    if ($("#datasetAccess")) {
+      $("#datasetAccess").onchange = e => { S.dsAccess = e.target.value; renderDatasets(); };
+    }
+    if ($("#exportDatasetsBib")) {
+      $("#exportDatasetsBib").onclick = () => exportDatasetsBibtex(filteredDatasets(), (S.dsQ || S.dsCat !== "all" || S.dsAccess !== "all") ? "neurorad_fm_datasets_filtered.bib" : "neurorad_fm_datasets_all18.bib");
+    }
+    if ($("#exportDatasetsCsv")) {
+      $("#exportDatasetsCsv").onclick = () => exportDatasetsCsv(filteredDatasets(), (S.dsQ || S.dsCat !== "all" || S.dsAccess !== "all") ? "neurorad_fm_datasets_filtered.csv" : "neurorad_fm_datasets_all18.csv");
+    }
+    if ($("#benchmarkModality")) {
+      $("#benchmarkModality").onchange = e => { S.benchMod = e.target.value; renderBenchmarks(); };
+    }
+
     $("#rModel").onchange = () => onModelChange();
     $("#runForm").onsubmit = submitRun;
     $("#refreshJobs").onclick = refreshJobs;
@@ -1711,6 +2091,8 @@
     initDrop();
     initConnect();
     renderFilters();
+    renderDatasets();
+    renderBenchmarks();
     renderRunModelOptions();
     renderCompareDock();
     go(location.hash.slice(1) || "models");

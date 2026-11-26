@@ -1,0 +1,27 @@
+# Python & virtual environments
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+env/
+
+# Backend runtime config, job outputs, and NIfTI scans (never commit patient/research scans or weights)
+backend/config.yaml
+backend/work/
+backend/external/
+*.nii
+*.nii.gz
+*.dcm
+*.h5
+*.ckpt
+*.pt
+*.pth
+*.safetensors
+*.bin
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

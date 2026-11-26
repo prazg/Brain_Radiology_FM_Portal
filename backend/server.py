@@ -26,7 +26,7 @@ from jobs import JobManager
 from runners import dispatch, runner_status
 from weights import WeightsManager, hf_cache_dir
 
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 settings = load_settings()
 registry = json.loads(REGISTRY_PATH.read_text(encoding="utf-8"))
 MODELS = {m["id"]: m for m in registry["models"]}
@@ -85,6 +85,9 @@ def health():
         "gpu": gpu,
         "packages": _mods(),
         "registry_version": registry.get("version"),
+        "model_count": len(registry.get("models", [])),
+        "dataset_count": len(registry.get("datasets", [])),
+        "benchmark_count": len(registry.get("benchmarks", [])),
         "scan_roots": [str(p) for p in settings.allowed_scan_roots],
         "queue": manager.q.qsize(),
         "hardware": hardware.detect(hf_cache_dir()),
@@ -125,6 +128,23 @@ def perf():
 @app.get("/api/models", dependencies=[Depends(require_key)])
 def models():
     return {m_id: runner_status(m, settings) for m_id, m in MODELS.items()}
+
+
+@app.get("/api/datasets", dependencies=[Depends(require_key)])
+def datasets():
+    return {
+        "datasets": registry.get("datasets", []),
+        "categories": registry.get("dataset_categories", {}),
+    }
+
+
+@app.get("/api/benchmarks", dependencies=[Depends(require_key)])
+def benchmarks():
+    return {
+        "benchmarks": registry.get("benchmarks", []),
+        "ecosystem": registry.get("ecosystem", []),
+        "literature_references": registry.get("literature_references", []),
+    }
 
 
 def _safe_scan_path(p: str) -> Path:

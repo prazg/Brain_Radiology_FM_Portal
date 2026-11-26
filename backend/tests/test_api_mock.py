@@ -1,7 +1,8 @@
 """End-to-end mock-mode test suite for the Brain Radiology FM Portal backend.
 
-Exercises `/api/health`, `/api/models`, `/api/weights`, path-traversal safety,
-and EVERY single one of the 25 models × all of its declared tasks."""
+Exercises registry schema integrity (28 models, 18 datasets, 8 benchmarks),
+`/api/health`, `/api/models`, `/api/datasets`, `/api/benchmarks`, `/api/weights`,
+path-traversal safety, and EVERY single one of the 28 models × all declared tasks."""
 from __future__ import annotations
 
 import io
@@ -45,6 +46,51 @@ def _png_bytes() -> bytes:
     return buf.getvalue()
 
 
+def test_registry_schema_datasets_and_benchmarks():
+    reg = json.loads((BACKEND_DIR.parent / "docs" / "models.json").read_text(encoding="utf-8"))
+    assert len(reg["models"]) == 28
+    assert len(reg["datasets"]) == 18
+    assert len(reg["benchmarks"]) == 8
+    assert len(reg.get("ecosystem", [])) >= 5
+
+    cat_ids = set(reg["categories"].keys())
+    task_ids = set(reg["tasks"].keys())
+    model_ids = set()
+    for m in reg["models"]:
+        assert m["id"] not in model_ids, f"Duplicate model id: {m['id']}"
+        model_ids.add(m["id"])
+        assert m["category"] in cat_ids, f"Invalid category on {m['id']}"
+        assert m["tasks"], f"No tasks on {m['id']}"
+        for t in m["tasks"]:
+            assert t in task_ids, f"Invalid task {t} on {m['id']}"
+        assert m["paper_url"].startswith("https://"), f"Invalid paper_url on {m['id']}"
+        assert m["link"].startswith("https://"), f"Invalid link on {m['id']}"
+
+    ds_cats = set(reg["dataset_categories"].keys())
+    ds_ids = set()
+    for d in reg["datasets"]:
+        assert d["id"] not in ds_ids, f"Duplicate dataset id: {d['id']}"
+        ds_ids.add(d["id"])
+        assert d["category"] in ds_cats, f"Invalid dataset category on {d['id']}"
+        assert d["access_tier"] in ("open", "registration", "credentialed"), f"Invalid access_tier on {d['id']}"
+        assert d["doi"], f"Missing DOI on dataset {d['id']}"
+        assert d["bibtex"].startswith("@"), f"Invalid BibTeX on dataset {d['id']}"
+        assert d["url"].startswith("http"), f"Invalid URL on dataset {d['id']}"
+        assert d["paper_url"].startswith("http"), f"Invalid paper_url on dataset {d['id']}"
+        assert d["cli_hint"], f"Missing cli_hint on dataset {d['id']}"
+
+    bench_ids = set()
+    for b in reg["benchmarks"]:
+        assert b["id"] not in bench_ids, f"Duplicate benchmark id: {b['id']}"
+        bench_ids.add(b["id"])
+        assert b["entries"], f"Empty leaderboard on benchmark {b['id']}"
+        assert b["doi"], f"Missing DOI on benchmark {b['id']}"
+        assert b["url"].startswith("http"), f"Invalid URL on benchmark {b['id']}"
+        for e in b["entries"]:
+            assert e["model_id"] in model_ids, f"Benchmark {b['id']} references unknown model_id {e['model_id']}"
+            assert isinstance(e["score"], (int, float)), f"Non-numeric score on {b['id']}/{e['model_id']}"
+
+
 def test_health_and_auth(client):
     tc, _ = client
     assert tc.get("/api/health").status_code == 401
@@ -53,15 +99,30 @@ def test_health_and_auth(client):
     body = r.json()
     assert body["ok"] is True
     assert body["mock"] is True
+    assert body["model_count"] == 28
+    assert body["dataset_count"] == 18
+    assert body["benchmark_count"] == 8
 
 
 def test_registry_and_models_ready(client):
     tc, _ = client
-    r = tc.get("/api/models", headers={"X-Portal-Key": "test-secret"})
+    hdr = {"X-Portal-Key": "test-secret"}
+    r = tc.get("/api/models", headers=hdr)
     assert r.status_code == 200
     models = r.json()
     assert len(models) == 28
     assert all(v["ready"] for v in models.values())
+
+    assert tc.get("/api/datasets").status_code == 401
+    rd = tc.get("/api/datasets", headers=hdr)
+    assert rd.status_code == 200
+    assert len(rd.json()["datasets"]) == 18
+
+    assert tc.get("/api/benchmarks").status_code == 401
+    rb = tc.get("/api/benchmarks", headers=hdr)
+    assert rb.status_code == 200
+    assert len(rb.json()["benchmarks"]) == 8
+    assert len(rb.json()["ecosystem"]) >= 5
 
 
 def test_scan_path_traversal_blocked(client, tmp_path):

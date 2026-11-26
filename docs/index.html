@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Brain Radiology FM Portal — NeuroRad-FM</title>
-<meta name="description" content="Run 28 open-weight 3D brain MRI, head CT, PET, and 4D fMRI foundation models — volumetric encoders (NeuroVFM, Neuro-JEPA, BrainFound, BrainIAC, Brain2Vec, NeuroFM, CT-FM), neuro vision–language report & triage models (NeuroVFM-LLM, Brainfound, BrainGemma3D, M3D-LaMed, MedGemma, RadFM), 3D segmentation (BrainSegFounder, SynthSeg, FastSurferVINN, VISTA3D, nnInteractive, MedSAM2), cross-modal synthesis/registration (BrainFM, BrainMorph), and fMRI connectomics (BrainLM, BrainGFM) — with verified paper links.">
+<meta name="description" content="Interactive PACS portal, open-access neuroimaging dataset explorer (18 cohorts), clinical benchmark leaderboards (8 benchmarks), verified BibTeX papers, and local GPU inference server for 28 open-weight 3D brain MRI, head CT, PET & 4D fMRI foundation models.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230c1824'/%3E%3Cellipse cx='16' cy='16' rx='10.5' ry='12' fill='none' stroke='%2338bdf8' stroke-width='2.2'/%3E%3Cpath d='M16 5v22M10.5 11.5c2 1.2 2.5 3.5 1 5.5s-1 4.2 1.5 5.2M21.5 11.5c-2 1.2-2.5 3.5-1 5.5s1 4.2-1.5 5.2' fill='none' stroke='%2338bdf8' stroke-width='1.7' stroke-linecap='round'/%3E%3Ccircle cx='20.5' cy='13.5' r='2.3' fill='%23f59e0b'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -25,7 +25,8 @@
     <a class="prazg-suite-link" href="https://prazg.github.io/3D_Neurosurgical_Atlas/" rel="noopener" title="Interactive browser-based 3D atlas of craniospinal anatomy, 76 walkthroughs &amp; neuro-oncological pathology">3D Neurosurgical Atlas</a>
     <a class="prazg-suite-link" href="https://prazg.github.io/brain_trials_finder/" rel="noopener" title="Discovers actively recruiting neuro-oncology clinical trials across ClinicalTrials.gov, ISRCTN, EU CTIS &amp; WHO ICTRP">Brain Trials Finder</a>
     <span class="prazg-suite-sep" aria-hidden="true"></span>
-    <a class="prazg-suite-link prazg-suite-link--active" href="https://prazg.github.io/Brain_Radiology_FM_Portal/" aria-current="page" rel="noopener" title="Interactive PACS portal &amp; GPU runner for 28 open-weight 3D Brain MRI, Head CT &amp; fMRI foundation models">Brain Radiology FM</a>
+    <a class="prazg-suite-link prazg-suite-link--active" href="https://prazg.github.io/Brain_Radiology_FM_Portal/" aria-current="page" rel="noopener" title="Interactive PACS portal, datasets, benchmarks &amp; GPU runner for 28 open-weight 3D Brain MRI, Head CT &amp; fMRI foundation models">Brain Radiology FM</a>
+    <a class="prazg-suite-link" href="https://prazg.github.io/Lung_Radiology_FM_Portal/" rel="noopener" title="Interactive Thoracic PACS portal, 18 lung cancer datasets, 8 benchmarks &amp; GPU runner for 33 open-weight lung &amp; thoracic FMs">Lung Radiology FM</a>
     <a class="prazg-suite-link" href="https://prazg.github.io/Histology_FM_Portal/" rel="noopener" title="Graphical frontend &amp; GPU runner for 55 open-weight clinical &amp; preclinical histology foundation models">Histology FM</a>
     <a class="prazg-suite-link" href="https://prazg.github.io/Animal_Pathology_FM_Portal/" rel="noopener" title="Frontend &amp; local runner for open-weight preclinical, rodent &amp; veterinary pathology foundation models">Animal Pathology FM</a>
     <a class="prazg-suite-link" href="https://prazg.github.io/Remote_Dicom_Viewer/" rel="noopener" title="Secure browser-based DICOM viewer for sending scans for remote radiological reporting">Remote DICOM Viewer</a>
@@ -47,6 +48,8 @@
     </a>
     <nav class="tabs" aria-label="Sections">
       <button data-view="models">Models</button>
+      <button data-view="datasets">Datasets</button>
+      <button data-view="benchmarks">Benchmarks</button>
       <button data-view="run">Run</button>
       <button data-view="results">Results</button>
       <button data-view="papers">Papers</button>
@@ -67,7 +70,7 @@
     <div class="intro">
       <div>
         <h1 id="h-models">Open-weight brain MRI, head CT &amp; fMRI foundation models on one PACS bench.</h1>
-        <p>Select a 3D neuroimaging foundation model, feed it NIfTI volumes (<code>.nii</code> / <code>.nii.gz</code>), DICOM series, or slice stacks, and inspect the output its training was built for: 3D patient embeddings, BrainAge &amp; morphometry, urgent MRI/CT diagnostic triage, structured neuroradiology reports, tri-planar parcellation &amp; lesion masks, cross-sequence synthesis, or 4D fMRI functional networks — with verified links to every paper. Inference runs on your own workstation or GPU server; this static page never touches patient scans.</p>
+        <p>Explore 28 open-weight neuroimaging foundation models, 18 open-access brain MRI/CT/fMRI datasets, and 8 clinical benchmark leaderboards — or feed NIfTI volumes (<code>.nii</code> / <code>.nii.gz</code>), DICOM series, or slice stacks for 3D embeddings, BrainAge &amp; morphometry, urgent MRI/CT triage, structured neuroradiology reports, tri-planar parcellation &amp; lesion masks, cross-sequence synthesis, or 4D fMRI decoding. Inference runs locally on your workstation or GPU server; this static page never touches patient scans.</p>
       </div>
       <div class="counts" id="counts"></div>
     </div>
@@ -101,6 +104,76 @@
         <div class="rack-toolbar" id="rackToolbar"></div>
         <div id="rack"></div>
       </div>
+    </div>
+  </section>
+
+  <!-- ═════════════ OPEN DATASETS ═════════════ -->
+  <section id="view-datasets" aria-labelledby="h-datasets" hidden>
+    <div class="intro">
+      <div>
+        <h2 id="h-datasets" style="margin-bottom:6px">Open-Access Brain Radiology &amp; Neuroimaging Datasets</h2>
+        <p class="muted">18 curated public cohorts spanning neuro-oncology mpMRI (BraTS, UCSF-PDGM, UPenn-GBM, LUMIERE), emergency Head CT &amp; stroke (RSNA ICH, CQ500, ISLES 2022, ATLAS v2.0), neurodegeneration &amp; lifespan MRI/PET (ADNI, OASIS-3, UK Biobank, Mindboggle-101/IXI), foundation pretraining &amp; VLM corpora (FOMO-MRI, M3D-Data, fastMRI Brain+), and 4D fMRI / BIDS archives (HCP, OpenNeuro, ABIDE) — with access tiers, CLI download commands, verified DOIs, and BibTeX.</p>
+      </div>
+      <div class="rack-exports">
+        <button class="btn ghost small" id="exportDatasetsBib" type="button">↓ Dataset BibTeX (.bib)</button>
+        <button class="btn ghost small" id="exportDatasetsCsv" type="button">↓ Dataset CSV</button>
+      </div>
+    </div>
+    <div class="dataset-filter-bar">
+      <div class="search-wrap" style="flex:1 1 280px">
+        <label class="sr-only" for="datasetSearch">Search neuroimaging datasets (press / to focus)</label>
+        <input id="datasetSearch" class="search" type="search" placeholder="Search dataset, TCIA, Zenodo, BIDS, BraTS, ICH, PET, fMRI, DOI…">
+        <kbd class="kbd-hint" id="datasetKbdHint" aria-hidden="true" title="Press / to focus search">/</kbd>
+      </div>
+      <select id="datasetCategory" class="filter-select" aria-label="Filter datasets by category">
+        <option value="all">All categories</option>
+        <option value="neuro_onc">Brain Tumors &amp; Neuro-Oncology</option>
+        <option value="stroke_ct">Acute Head CT, ICH &amp; Stroke</option>
+        <option value="neurodeg">Neurodegeneration &amp; Lifespan MRI</option>
+        <option value="vlm_pretrain">FM Pretraining, VLM &amp; Reconstruction</option>
+        <option value="fmri_conn">4D fMRI, Connectomics &amp; Open BIDS</option>
+      </select>
+      <select id="datasetAccess" class="filter-select" aria-label="Filter datasets by access tier">
+        <option value="all">All access tiers</option>
+        <option value="open">Direct Open Access</option>
+        <option value="registration">Free Registration / DUA</option>
+        <option value="credentialed">Credentialed / Managed</option>
+      </select>
+    </div>
+    <div class="rack-toolbar" id="datasetToolbar" style="margin-bottom:14px"></div>
+    <div id="datasetsGrid" class="datasets-grid"></div>
+  </section>
+
+  <!-- ═════════════ BENCHMARKS & LEADERBOARDS ═════════════ -->
+  <section id="view-benchmarks" aria-labelledby="h-benchmarks" hidden>
+    <div class="intro">
+      <div>
+        <h2 id="h-benchmarks" style="margin-bottom:6px">Neuroimaging Benchmarks &amp; Visual Leaderboards</h2>
+        <p class="muted">Published evaluation metrics across 8 flagship open benchmarks spanning Adult Glioma 3D segmentation (BraTS), acute Head CT hemorrhage triage (CQ500 / RSNA ICH), whole-brain anatomical parcellation, lifespan BrainAge regression (MAE), neurodegeneration &amp; clinical MRI diagnosis (ADNI / UCSF-PDGM), ischemic stroke segmentation (ATLAS / ISLES), 3D neuroradiology VLM reporting, and 4D fMRI connectomics.</p>
+      </div>
+      <div class="rack-exports">
+        <label class="sr-only" for="benchmarkModality">Filter benchmarks by modality</label>
+        <select id="benchmarkModality" class="filter-select" aria-label="Filter benchmarks by modality">
+          <option value="all">All modalities</option>
+          <option value="Structural & mpMRI">Structural &amp; mpMRI</option>
+          <option value="Head CT">Head CT</option>
+          <option value="Brain MRI + Head CT">Brain MRI + Head CT</option>
+          <option value="4D fMRI & Connectomics">4D fMRI &amp; Connectomics</option>
+        </select>
+      </div>
+    </div>
+    <div class="rack-toolbar" id="benchmarkToolbar" style="margin:16px 0 14px"></div>
+    <div id="benchmarksGrid" class="benchmarks-grid"></div>
+    <p class="bench-note small muted">Metrics reflect published results reported in each model's peer-reviewed publication or preprint on the stated cohort and evaluation protocol. Click any model name to inspect its full architecture, hardware fit, CLI quickstart, and verified citation.</p>
+    <div class="ecosystem-section">
+      <h3>Open Neuroimaging Tooling &amp; Clinical Standards</h3>
+      <p class="small muted" style="margin-top:4px">Core open-source frameworks, cloud data archives, BIDS I/O standards, and neuro-oncology clinical guidelines powering this portal.</p>
+      <div id="ecosystemGrid" class="ecosystem-grid"></div>
+    </div>
+    <div class="ecosystem-section">
+      <h3>Closed-Weight &amp; Reference Literature Benchmarks</h3>
+      <p class="small muted" style="margin-top:4px">Proprietary and foundational neuroimaging infrastructure references included for citation completeness.</p>
+      <div id="litRefGrid" class="bench-grid"></div>
     </div>
   </section>
 
@@ -169,12 +242,12 @@
     </div>
   </section>
 
-  <!-- ═════════════ PAPERS & BENCHMARKS ═════════════ -->
+  <!-- ═════════════ PAPERS & BIBTEX ═════════════ -->
   <section id="view-papers" aria-labelledby="h-papers" hidden>
     <div class="intro">
       <div>
-        <h2 id="h-papers" style="margin-bottom:6px">Papers, BibTeX &amp; neuroimaging benchmarks</h2>
-        <p class="muted">Verified journal DOIs, arXiv/medRxiv preprints, and one-click BibTeX citations for all 28 open-weight brain radiology foundation models, alongside standard neuroimaging challenges (BraTS, FOMO-MRI, ATLAS, RSNA ICH, ADNI/OpenNeuro, UK Biobank) and ecosystem references.</p>
+        <h2 id="h-papers" style="margin-bottom:6px">Verified Papers, Preprints &amp; BibTeX Library</h2>
+        <p class="muted">Complete searchable bibliography covering all 28 open-weight Brain Radiology Foundation Models and 18 Open-Access Neuroimaging Datasets with verified DOIs, arXiv/medRxiv links, GitHub/Hugging Face repositories, and one-click BibTeX / CSV export.</p>
       </div>
     </div>
     <div id="papersView"></div>
@@ -220,6 +293,7 @@
 </footer>
 
 <aside class="cmp-dock" id="compareDock" aria-label="3D model comparator dock" hidden></aside>
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 <dialog class="drawer" id="drawer" aria-labelledby="drawerTitle"></dialog>
 <dialog class="cmp-modal" id="compareModal" aria-labelledby="cmpTitle"></dialog>
 
